@@ -87,6 +87,10 @@ interface StoreState {
 
     // Canvas
     insertToCanvas: (objectId: string) => void;
+    insertAllToCanvas: () => void;
+
+    // Project Management
+    resetProject: () => void;
 }
 
 const initialContext: ResearchContext = {
@@ -265,5 +269,34 @@ export const useStore = create<StoreState>((set, get) => ({
         if (object) {
             postMessage({ type: 'INSERT_RESEARCH_OBJECT', payload: object });
         }
+    },
+
+    insertAllToCanvas: () => {
+        const objects = get().researchObjects;
+        // Insert each object with a small delay to avoid overwhelming Figma
+        objects.forEach((object, index) => {
+            setTimeout(() => {
+                postMessage({ type: 'INSERT_RESEARCH_OBJECT', payload: object });
+            }, index * 300); // 300ms delay between each insertion
+        });
+    },
+
+    // Project Management
+    resetProject: () => {
+        // Clear state in Figma storage
+        postMessage({ type: 'CLEAR_STATE' });
+
+        // Reset local state
+        set({
+            context: initialContext,
+            canvasSelection: { nodes: [], extractedText: '' },
+            researchObjects: [],
+            transcripts: [],
+            ui: {
+                ...get().ui,
+                currentStep: 0,
+                error: null,
+            },
+        });
     },
 }));

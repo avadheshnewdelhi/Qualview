@@ -1,12 +1,16 @@
 import { useCallback, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, X, Loader2, Image } from 'lucide-react';
+import { Upload, X, Loader2, Image, CheckCircle } from 'lucide-react';
 
 interface FileUploadProps {
     onFileProcessed: (content: string, fileName: string) => void;
     acceptTypes?: string;
     maxSizeMB?: number;
+    maxFiles?: number;
+    multiple?: boolean;
+    title?: string;
+    description?: string;
 }
 
 const SUPPORTED_TYPES = [
@@ -21,53 +25,57 @@ const SUPPORTED_TYPES = [
     'image/jpeg',
 ];
 
+interface ProcessingState {
+    currentFile: string;
+    currentIndex: number;
+    totalFiles: number;
+    progress: number;
+    status: string;
+}
+
 export function FileUpload({
     onFileProcessed,
-    maxSizeMB = 10
+    maxSizeMB = 10,
+    maxFiles = 25,
+    multiple = false,
+    title = 'File Upload',
+    description = 'Upload documents or images for context (TXT, CSV, XLSX, DOCX, PNG, JPG)',
 }: FileUploadProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [processingFile, setProcessingFile] = useState<string | null>(null);
-    const [processingProgress, setProcessingProgress] = useState(0);
-    const [processingStatus, setProcessingStatus] = useState<string>('');
+    const [processing, setProcessing] = useState<ProcessingState | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [completedFiles, setCompletedFiles] = useState<string[]>([]);
 
-    const processFile = useCallback(async (file: File) => {
-        setError(null);
-        setProcessingProgress(0);
-        setProcessingStatus('');
-
+    const processFile = useCallback(async (file: File): Promise<boolean> => {
         // Check file size
         if (file.size > maxSizeMB * 1024 * 1024) {
-            setError(`File exceeds ${maxSizeMB}MB limit`);
-            return;
+            setError(`${file.name} exceeds ${maxSizeMB}MB limit`);
+            return false;
         }
 
         // Check file type
         if (!SUPPORTED_TYPES.includes(file.type) && !file.name.match(/\.(csv|xlsx?|pdf|docx?|txt|png|jpe?g)$/i)) {
-            setError('Unsupported file type');
-            return;
+            setError(`${file.name}: Unsupported file type`);
+            return false;
         }
-
-        setIsProcessing(true);
-        setProcessingFile(file.name);
 
         try {
             let content = '';
 
             // Plain text files
             if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-                setProcessingStatus('Reading text file...');
+                setProcessing(prev => prev ? { ...prev, status: 'Reading text file...' } : null);
                 content = await file.text();
             }
             // CSV files
             else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-                setProcessingStatus('Parsing CSV...');
+                setProcessing(prev => prev ? { ...prev, status: 'Parsing CSV...' } : null);
                 content = await file.text();
             }
             // Excel files
             else if (file.name.match(/\.xlsx?$/i)) {
-                setProcessingStatus('Parsing Excel file...');
+                setProcessing(prev => prev ? { ...prev, status: 'Parsing Excel file...' } : null);
                 const XLSX = await import('xlsx');
                 const buffer = await file.arrayBuffer();
                 const workbook = XLSX.read(buffer, { type: 'array' });
@@ -76,7 +84,7 @@ export function FileUpload({
             }
             // Word documents
             else if (file.name.match(/\.docx?$/i)) {
-                setProcessingStatus('Extracting text from document...');
+                setProcessing(prev => prev ? { ...prev, status: 'Extracting text...' } : null);
                 const mammoth = await import('mammoth');
                 const buffer = await file.arrayBuffer();
                 const result = await mammoth.extractRawText({ arrayBuffer: buffer });
@@ -84,86 +92,97 @@ export function FileUpload({
             }
             // PDF files
             else if (file.name.match(/\.pdf$/i)) {
-                setProcessingStatus('PDF support coming soon...');
-                setError('PDF support coming soon. Please copy text content manually or use DOCX/TXT format.');
-                setIsProcessing(false);
-                setProcessingFile(null);
-                return;
+                setError(`${file.name}: PDF support coming soon. Please use DOCX/TXT format.`);
+                return false;
             }
             // Images - OCR with Tesseract.js
             else if (file.name.match(/\.(png|jpe?g)$/i)) {
-                setProcessingStatus('Loading OCR engine...');
-                setProcessingProgress(10);
+                setProcessing(prev => prev ? { ...prev, status: 'Loading OCR engine...', progress: 10 } : null);
 
-                // Dynamic import of tesseract.js
                 const Tesseract = await import('tesseract.js');
-
-                setProcessingStatus('Initializing text recognition...');
-                setProcessingProgress(20);
-
-                // Create a URL for the image file
                 const imageUrl = URL.createObjectURL(file);
 
                 try {
-                    // Perform OCR with progress tracking
                     const result = await Tesseract.recognize(
                         imageUrl,
-                        'eng', // English language
+                        'eng',
                         {
                             logger: (m) => {
                                 if (m.status === 'recognizing text') {
                                     const progress = Math.round(20 + (m.progress * 70));
-                                    setProcessingProgress(progress);
-                                    setProcessingStatus(`Recognizing text... ${Math.round(m.progress * 100)}%`);
+                                    setProcessing(prev => prev ? {
+                                        ...prev,
+                                        status: `Recognizing text... ${Math.round(m.progress * 100)}%`,
+                                        progress
+                                    } : null);
                                 } else if (m.status === 'loading tesseract core') {
-                                    setProcessingStatus('Loading OCR core...');
-                                    setProcessingProgress(15);
-                                } else if (m.status === 'initializing tesseract') {
-                                    setProcessingStatus('Initializing OCR...');
-                                    setProcessingProgress(18);
+                                    setProcessing(prev => prev ? { ...prev, status: 'Loading OCR core...', progress: 15 } : null);
                                 } else if (m.status === 'loading language traineddata') {
-                                    setProcessingStatus('Loading language data...');
-                                    setProcessingProgress(25);
-                                } else if (m.status === 'initializing api') {
-                                    setProcessingStatus('Starting recognition...');
-                                    setProcessingProgress(30);
+                                    setProcessing(prev => prev ? { ...prev, status: 'Loading language data...', progress: 25 } : null);
                                 }
                             }
                         }
                     );
-
-                    setProcessingProgress(95);
-                    setProcessingStatus('Finalizing...');
-
                     content = result.data.text;
-
-                    // Check confidence
-                    if (result.data.confidence < 50) {
-                        console.warn('Low OCR confidence:', result.data.confidence);
-                    }
                 } finally {
-                    // Clean up the blob URL
                     URL.revokeObjectURL(imageUrl);
                 }
-
-                setProcessingProgress(100);
             }
 
             if (content.trim()) {
                 onFileProcessed(content, file.name);
+                return true;
             } else {
-                setError('No text content could be extracted from this file');
+                setError(`${file.name}: No text content could be extracted`);
+                return false;
             }
         } catch (err) {
             console.error('File processing error:', err);
-            setError('Failed to process file. Please try a different format.');
-        } finally {
-            setIsProcessing(false);
-            setProcessingFile(null);
-            setProcessingProgress(0);
-            setProcessingStatus('');
+            setError(`${file.name}: Failed to process file`);
+            return false;
         }
     }, [maxSizeMB, onFileProcessed]);
+
+    const processFiles = useCallback(async (files: File[]) => {
+        setError(null);
+        setCompletedFiles([]);
+
+        // Limit to maxFiles
+        const filesToProcess = files.slice(0, maxFiles);
+
+        if (files.length > maxFiles) {
+            setError(`Only first ${maxFiles} files will be processed`);
+        }
+
+        setIsProcessing(true);
+        const completed: string[] = [];
+
+        for (let i = 0; i < filesToProcess.length; i++) {
+            const file = filesToProcess[i];
+
+            setProcessing({
+                currentFile: file.name,
+                currentIndex: i + 1,
+                totalFiles: filesToProcess.length,
+                progress: 0,
+                status: 'Starting...',
+            });
+
+            const success = await processFile(file);
+            if (success) {
+                completed.push(file.name);
+                setCompletedFiles([...completed]);
+            }
+        }
+
+        setIsProcessing(false);
+        setProcessing(null);
+
+        // Show success message briefly
+        if (completed.length > 0) {
+            setTimeout(() => setCompletedFiles([]), 3000);
+        }
+    }, [maxFiles, processFile]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -171,26 +190,30 @@ export function FileUpload({
 
         const files = Array.from(e.dataTransfer.files);
         if (files.length > 0) {
-            processFile(files[0]);
+            if (multiple) {
+                processFiles(files);
+            } else {
+                processFiles([files[0]]);
+            }
         }
-    }, [processFile]);
+    }, [multiple, processFiles]);
 
     const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files && files.length > 0) {
-            processFile(files[0]);
+            processFiles(Array.from(files));
         }
         e.target.value = ''; // Reset input
-    }, [processFile]);
+    }, [processFiles]);
 
-    const isOCRProcessing = processingFile?.match(/\.(png|jpe?g)$/i);
+    const isOCRProcessing = processing?.currentFile?.match(/\.(png|jpe?g)$/i);
 
     return (
         <Card>
             <CardHeader className="py-3">
-                <CardTitle className="text-sm">File Upload</CardTitle>
+                <CardTitle className="text-sm">{title}</CardTitle>
                 <CardDescription className="text-xs">
-                    Upload documents or images for context (TXT, CSV, XLSX, DOCX, PNG, JPG)
+                    {description}
                 </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
@@ -210,10 +233,11 @@ export function FileUpload({
                         type="file"
                         className="hidden"
                         accept=".txt,.csv,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg"
+                        multiple={multiple}
                         onChange={handleFileSelect}
                     />
 
-                    {isProcessing ? (
+                    {isProcessing && processing ? (
                         <div className="flex flex-col items-center gap-3">
                             {isOCRProcessing ? (
                                 <Image className="h-8 w-8 animate-pulse text-primary" />
@@ -221,19 +245,41 @@ export function FileUpload({
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             )}
                             <div className="w-full max-w-xs space-y-2">
-                                <p className="text-sm font-medium">{processingFile}</p>
-                                <p className="text-xs text-muted-foreground">{processingStatus}</p>
-                                {isOCRProcessing && processingProgress > 0 && (
-                                    <Progress value={processingProgress} className="h-2" />
+                                <p className="text-sm font-medium">
+                                    {processing.totalFiles > 1
+                                        ? `Processing ${processing.currentIndex} of ${processing.totalFiles}`
+                                        : processing.currentFile
+                                    }
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">{processing.currentFile}</p>
+                                <p className="text-xs text-muted-foreground">{processing.status}</p>
+                                {(isOCRProcessing || processing.totalFiles > 1) && (
+                                    <Progress
+                                        value={processing.totalFiles > 1
+                                            ? ((processing.currentIndex - 1) / processing.totalFiles) * 100 + (processing.progress / processing.totalFiles)
+                                            : processing.progress
+                                        }
+                                        className="h-2"
+                                    />
                                 )}
                             </div>
+                        </div>
+                    ) : completedFiles.length > 0 ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <CheckCircle className="h-8 w-8 text-green-500" />
+                            <p className="text-sm font-medium text-green-600">
+                                {completedFiles.length} file{completedFiles.length > 1 ? 's' : ''} uploaded successfully
+                            </p>
                         </div>
                     ) : (
                         <>
                             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm font-medium">Drop file here or click to browse</p>
+                            <p className="text-sm font-medium">
+                                {multiple ? 'Drop files here or click to browse' : 'Drop file here or click to browse'}
+                            </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Max {maxSizeMB}MB • TXT, CSV, XLSX, DOCX, PNG, JPG
+                                Max {maxSizeMB}MB per file • TXT, CSV, XLSX, DOCX, PNG, JPG
+                                {multiple && ` • Up to ${maxFiles} files`}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                                 <Image className="h-3 w-3" />

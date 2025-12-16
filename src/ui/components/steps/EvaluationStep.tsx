@@ -177,7 +177,13 @@ export function EvaluationStep() {
                     </p>
                 </div>
 
-                <FileUpload onFileProcessed={handleFileProcessed} />
+                <FileUpload
+                    onFileProcessed={handleFileProcessed}
+                    multiple={true}
+                    maxFiles={25}
+                    title="Upload Screener Responses"
+                    description="Upload CSV/Excel files with participant responses (up to 25 files)"
+                />
 
                 {responses.length > 0 && (
                     <Card>

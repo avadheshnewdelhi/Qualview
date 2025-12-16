@@ -10,6 +10,7 @@ export type UIMessage =
     | { type: 'GET_FILE_TYPE' }
     | { type: 'GET_SETTINGS' }
     | { type: 'SAVE_SETTINGS'; payload: Settings }
+    | { type: 'CLEAR_STATE' }
     | { type: 'RESIZE'; payload: { width: number; height: number } };
 
 // Main Thread → UI Messages
@@ -17,6 +18,7 @@ export type MainMessage =
     | { type: 'SELECTION_CHANGED'; payload: SelectionData }
     | { type: 'STATE_LOADED'; payload: PersistedState | null }
     | { type: 'STATE_SAVED' }
+    | { type: 'STATE_CLEARED' }
     | { type: 'OBJECT_INSERTED'; payload: { objectId: string; nodeId: string } }
     | { type: 'FILE_TYPE'; payload: 'figma' | 'figjam' }
     | { type: 'SETTINGS_LOADED'; payload: Settings | null }

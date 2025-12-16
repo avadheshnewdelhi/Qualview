@@ -1,7 +1,7 @@
 /// <reference types="@figma/plugin-typings" />
 
 import { getSelectionData } from '../canvas/selection';
-import { loadState, saveState, loadSettings, saveSettings } from '../persistence/storage';
+import { loadState, saveState, loadSettings, saveSettings, clearState } from '../persistence/storage';
 import { insertResearchObject } from '../canvas/renderer';
 
 interface UIMessage {
@@ -90,6 +90,19 @@ export async function handleMessage(msg: UIMessage): Promise<void> {
                         code: 'INSERT_FAILED',
                         message: error instanceof Error ? error.message : 'Failed to insert object',
                     },
+                });
+            }
+            break;
+        }
+
+        case 'CLEAR_STATE': {
+            const success = await clearState();
+            if (success) {
+                figma.ui.postMessage({ type: 'STATE_CLEARED' });
+            } else {
+                figma.ui.postMessage({
+                    type: 'ERROR',
+                    payload: { code: 'CLEAR_FAILED', message: 'Failed to clear state' },
                 });
             }
             break;

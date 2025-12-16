@@ -134,7 +134,13 @@ export function SynthesisStep() {
                 </p>
             </div>
 
-            <FileUpload onFileProcessed={handleFileProcessed} />
+            <FileUpload
+                onFileProcessed={handleFileProcessed}
+                multiple={true}
+                maxFiles={25}
+                title="Upload Transcripts"
+                description="Upload interview transcripts (TXT, DOCX, or images for OCR - up to 25 files)"
+            />
 
             {transcripts.length > 0 && (
                 <Card>
