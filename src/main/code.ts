@@ -3,7 +3,8 @@
 import { handleMessage } from './messages/handler';
 import { setupSelectionListener } from './canvas/selection';
 
-// Show the plugin UI
+// Show the plugin UI with resize enabled
+// Minimum size is enforced in the RESIZE message handler
 figma.showUI(__html__, {
     width: 400,
     height: 600,

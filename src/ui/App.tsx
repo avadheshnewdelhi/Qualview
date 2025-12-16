@@ -5,6 +5,7 @@ import { StepIndicator } from '@/components/layout/StepIndicator';
 import { MainContent } from '@/components/layout/MainContent';
 import { OfflineNotice } from '@/components/shared/OfflineNotice';
 import { SettingsDialog } from '@/components/shared/SettingsDialog';
+import { ResizeHandle } from '@/components/shared/ResizeHandle';
 import { postMessage } from '@/lib/figma';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
@@ -55,12 +56,14 @@ export default function App() {
     }, [initializeFromFigma, setFileType, setSettings]);
 
     return (
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-screen relative">
             <Header />
             {!isOnline && <OfflineNotice />}
             <StepIndicator />
             <MainContent />
             <SettingsDialog />
+            <ResizeHandle />
         </div>
     );
 }
+

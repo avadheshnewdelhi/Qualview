@@ -110,7 +110,12 @@ export async function handleMessage(msg: UIMessage): Promise<void> {
 
         case 'RESIZE': {
             const { width, height } = msg.payload as { width: number; height: number };
-            figma.ui.resize(width, height);
+            // Enforce minimum dimensions
+            const MIN_WIDTH = 400;
+            const MIN_HEIGHT = 600;
+            const finalWidth = Math.max(width, MIN_WIDTH);
+            const finalHeight = Math.max(height, MIN_HEIGHT);
+            figma.ui.resize(finalWidth, finalHeight);
             break;
         }
 
