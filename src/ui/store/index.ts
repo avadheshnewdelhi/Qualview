@@ -1,0 +1,269 @@
+import { create } from 'zustand';
+import { v4 as uuidv4 } from 'uuid';
+import type {
+    ResearchContext,
+    ResearchObject,
+    PersistedState,
+    Settings,
+    ContextSource,
+    SelectionData,
+    ResearchObjectType,
+    ResearchObjectContent,
+    ConfidenceLevel,
+    Transcript,
+} from '@/types';
+import { postMessage } from '@/lib/figma';
+
+// Workflow steps
+export const STEPS = [
+    { id: 0, name: 'Context', description: 'Gather research context' },
+    { id: 1, name: 'Framing', description: 'Define research approach' },
+    { id: 2, name: 'Plan', description: 'Create research plan' },
+    { id: 3, name: 'Screener', description: 'Generate screener questions' },
+    { id: 4, name: 'Evaluate', description: 'Evaluate responses' },
+    { id: 5, name: 'Interview', description: 'Create interview guide' },
+    { id: 6, name: 'Synthesis', description: 'Synthesize insights' },
+] as const;
+
+interface UIState {
+    currentStep: number;
+    isLoading: boolean;
+    loadingMessage: string;
+    error: string | null;
+    settingsOpen: boolean;
+    fileType: 'figma' | 'figjam';
+}
+
+interface StoreState {
+    // UI State
+    ui: UIState;
+
+    // Context
+    context: ResearchContext;
+    canvasSelection: SelectionData;
+
+    // Research Objects
+    researchObjects: ResearchObject[];
+
+    // Transcripts
+    transcripts: Transcript[];
+
+    // Settings
+    settings: Settings | null;
+
+    // Actions
+    setCurrentStep: (step: number) => void;
+    setLoading: (loading: boolean, message?: string) => void;
+    setError: (error: string | null) => void;
+    setSettingsOpen: (open: boolean) => void;
+    setFileType: (type: 'figma' | 'figjam') => void;
+
+    // Context Actions
+    setCanvasSelection: (selection: SelectionData) => void;
+    addContextSource: (source: Omit<ContextSource, 'id'>) => void;
+    removeContextSource: (id: string) => void;
+    updateNormalizedSummary: (summary: string) => void;
+
+    // Research Object Actions
+    addResearchObject: <T extends ResearchObjectContent>(
+        type: ResearchObjectType,
+        content: T,
+        confidence: ConfidenceLevel,
+        suggestions: string[]
+    ) => ResearchObject<T>;
+    updateResearchObject: (id: string, updates: Partial<ResearchObject>) => void;
+    getResearchObject: (type: ResearchObjectType) => ResearchObject | undefined;
+
+    // Transcript Actions
+    addTranscripts: (transcripts: Omit<Transcript, 'id'>[]) => void;
+    removeTranscript: (id: string) => void;
+
+    // Settings Actions
+    setSettings: (settings: Settings) => void;
+
+    // Persistence
+    initializeFromFigma: (state: PersistedState) => void;
+    saveToFigma: () => void;
+
+    // Canvas
+    insertToCanvas: (objectId: string) => void;
+}
+
+const initialContext: ResearchContext = {
+    sources: [],
+    normalizedSummary: '',
+    lastUpdated: Date.now(),
+};
+
+const initialUI: UIState = {
+    currentStep: 0,
+    isLoading: false,
+    loadingMessage: '',
+    error: null,
+    settingsOpen: false,
+    fileType: 'figma',
+};
+
+export const useStore = create<StoreState>((set, get) => ({
+    // Initial State
+    ui: initialUI,
+    context: initialContext,
+    canvasSelection: { nodes: [], extractedText: '' },
+    researchObjects: [],
+    transcripts: [],
+    settings: null,
+
+    // UI Actions
+    setCurrentStep: (step) =>
+        set((state) => ({
+            ui: { ...state.ui, currentStep: step },
+        })),
+
+    setLoading: (loading, message = '') =>
+        set((state) => ({
+            ui: { ...state.ui, isLoading: loading, loadingMessage: message },
+        })),
+
+    setError: (error) =>
+        set((state) => ({
+            ui: { ...state.ui, error },
+        })),
+
+    setSettingsOpen: (open) =>
+        set((state) => ({
+            ui: { ...state.ui, settingsOpen: open },
+        })),
+
+    setFileType: (type) =>
+        set((state) => ({
+            ui: { ...state.ui, fileType: type },
+        })),
+
+    // Context Actions
+    setCanvasSelection: (selection) => set({ canvasSelection: selection }),
+
+    addContextSource: (source) =>
+        set((state) => ({
+            context: {
+                ...state.context,
+                sources: [
+                    ...state.context.sources,
+                    { ...source, id: uuidv4() },
+                ],
+                lastUpdated: Date.now(),
+            },
+        })),
+
+    removeContextSource: (id) =>
+        set((state) => ({
+            context: {
+                ...state.context,
+                sources: state.context.sources.filter((s) => s.id !== id),
+                lastUpdated: Date.now(),
+            },
+        })),
+
+    updateNormalizedSummary: (summary) =>
+        set((state) => ({
+            context: {
+                ...state.context,
+                normalizedSummary: summary,
+                lastUpdated: Date.now(),
+            },
+        })),
+
+    // Research Object Actions
+    addResearchObject: (type, content, confidence, suggestions) => {
+        const newObject: ResearchObject = {
+            id: uuidv4(),
+            type,
+            content,
+            confidence,
+            improvementSuggestions: suggestions,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        };
+
+        set((state) => ({
+            researchObjects: [
+                ...state.researchObjects.filter((o) => o.type !== type),
+                newObject,
+            ],
+        }));
+
+        // Auto-save after adding
+        setTimeout(() => get().saveToFigma(), 100);
+
+        return newObject;
+    },
+
+    updateResearchObject: (id, updates) =>
+        set((state) => ({
+            researchObjects: state.researchObjects.map((o) =>
+                o.id === id ? { ...o, ...updates, updatedAt: Date.now() } : o
+            ),
+        })),
+
+    getResearchObject: (type) => {
+        return get().researchObjects.find((o) => o.type === type);
+    },
+
+    // Transcript Actions
+    addTranscripts: (newTranscripts) => {
+        const currentCount = get().transcripts.length;
+        const remaining = 25 - currentCount;
+        const toAdd = newTranscripts.slice(0, remaining);
+
+        set((state) => ({
+            transcripts: [
+                ...state.transcripts,
+                ...toAdd.map((t) => ({ ...t, id: uuidv4() })),
+            ],
+        }));
+    },
+
+    removeTranscript: (id) =>
+        set((state) => ({
+            transcripts: state.transcripts.filter((t) => t.id !== id),
+        })),
+
+    // Settings Actions
+    setSettings: (settings) => {
+        set({ settings });
+        postMessage({ type: 'SAVE_SETTINGS', payload: settings });
+    },
+
+    // Persistence
+    initializeFromFigma: (state) => {
+        set({
+            context: state.context,
+            researchObjects: state.researchObjects,
+            transcripts: state.transcripts,
+            ui: {
+                ...get().ui,
+                currentStep: state.currentStep,
+            },
+        });
+    },
+
+    saveToFigma: () => {
+        const state = get();
+        const persistedState: PersistedState = {
+            version: 1,
+            context: state.context,
+            researchObjects: state.researchObjects,
+            currentStep: state.ui.currentStep,
+            transcripts: state.transcripts,
+            lastSaved: Date.now(),
+        };
+        postMessage({ type: 'SAVE_STATE', payload: persistedState });
+    },
+
+    // Canvas
+    insertToCanvas: (objectId) => {
+        const object = get().researchObjects.find((o) => o.id === objectId);
+        if (object) {
+            postMessage({ type: 'INSERT_RESEARCH_OBJECT', payload: object });
+        }
+    },
+}));

@@ -1,0 +1,14 @@
+{
+  "name": "Qualview",
+  "id": "qualview-ai-research-copilot",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/index.html",
+  "documentAccess": "dynamic-page",
+  "editorType": ["figma", "figjam"],
+  "networkAccess": {
+    "allowedDomains": ["https://api.openai.com"],
+    "reasoning": "Required for AI-powered research assistance via OpenAI API"
+  },
+  "permissions": ["currentuser"]
+}
