@@ -15,7 +15,7 @@ interface UIMessage {
 export async function handleMessage(msg: UIMessage): Promise<void> {
     switch (msg.type) {
         case 'GET_SELECTION': {
-            const selectionData = getSelectionData();
+            const selectionData = await getSelectionData();
             figma.ui.postMessage({
                 type: 'SELECTION_CHANGED',
                 payload: selectionData,

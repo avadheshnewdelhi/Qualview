@@ -7,32 +7,156 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import {
     MousePointer2,
     FileText,
     Upload,
     X,
-    CheckCircle,
-    ArrowRight
+    ArrowRight,
+    Image,
+    Loader2
 } from 'lucide-react';
 import { FileUpload } from '@/components/context/FileUpload';
+import { getOpenAIClient } from '@/lib/openai';
+import type { SelectionNode } from '@/types';
 
 export function ContextStep() {
     const { context, addContextSource, removeContextSource, setCurrentStep } = useStore();
     const { selection, hasSelection, extractedText } = useSelection();
     const [manualInput, setManualInput] = useState('');
     const [activeTab, setActiveTab] = useState('canvas');
+    const [isProcessingOCR, setIsProcessingOCR] = useState(false);
+    const [ocrProgress, setOcrProgress] = useState(0);
+    const [ocrStatus, setOcrStatus] = useState('');
 
-    const handleAddCanvasContext = () => {
-        if (extractedText) {
+    // Check if selection has images
+    const hasImages = selection.hasImages || false;
+
+    // Collect all image data from nodes
+    const collectImageData = (nodes: SelectionNode[]): string[] => {
+        const images: string[] = [];
+        for (const node of nodes) {
+            if (node.imageData) {
+                images.push(node.imageData);
+            }
+            if (node.children) {
+                images.push(...collectImageData(node.children));
+            }
+        }
+        return images;
+    };
+
+    // Process images with OCR using OpenAI Vision API
+    // (Tesseract.js is blocked by Figma's Content Security Policy)
+    const processImagesWithOCR = async (): Promise<string> => {
+        const { settings } = useStore.getState();
+
+        if (!settings?.apiKey) {
+            setOcrStatus('Please configure OpenAI API key in settings');
+            return '';
+        }
+
+        const images = collectImageData(selection.nodes);
+        console.log('OCR: Found images:', images.length, 'from', selection.nodes.length, 'nodes');
+
+        if (images.length === 0) {
+            console.warn('OCR: No image data found in selection nodes');
+            if (selection.hasImages) {
+                setOcrStatus('Images detected but could not be exported. Please try re-selecting.');
+            }
+            return '';
+        }
+
+        setIsProcessingOCR(true);
+        setOcrProgress(0);
+        setOcrStatus('Extracting text with AI Vision...');
+
+        try {
+            const client = getOpenAIClient(settings);
+            const ocrResults: string[] = [];
+
+            for (let i = 0; i < images.length; i++) {
+                setOcrStatus(`Processing image ${i + 1} of ${images.length}...`);
+                setOcrProgress(Math.round((i / images.length) * 100));
+                console.log(`OCR: Processing image ${i + 1}`);
+
+                const response = await client.chat.completions.create({
+                    model: 'gpt-4o',
+                    max_tokens: 2000,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: 'Extract and transcribe ALL text visible in this image. Include any handwritten notes, sticky notes, labels, titles, and any other text. Preserve the original structure and formatting. Only return the extracted text, no commentary.'
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: images[i],
+                                        detail: 'high'
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                });
+
+                const extractedText = response.choices[0]?.message?.content || '';
+                console.log(`OCR: Image ${i + 1} result:`, extractedText.slice(0, 100));
+
+                if (extractedText.trim()) {
+                    ocrResults.push(`[Image ${i + 1}]\n${extractedText.trim()}`);
+                }
+            }
+
+            setOcrProgress(100);
+            setOcrStatus('Done!');
+            const finalText = ocrResults.join('\n\n');
+            console.log('OCR: Final extracted text length:', finalText.length);
+            return finalText;
+        } catch (error) {
+            console.error('OCR error:', error);
+            setOcrStatus('Failed to extract text from images');
+            return '';
+        } finally {
+            setIsProcessingOCR(false);
+        }
+    };
+
+    const handleAddCanvasContext = async () => {
+        let contentToAdd = extractedText || '';
+        console.log('handleAddCanvasContext: Starting with extractedText length:', contentToAdd.length);
+        console.log('handleAddCanvasContext: hasImages =', hasImages);
+
+        // If there are images, process them with OCR
+        if (hasImages) {
+            const ocrText = await processImagesWithOCR();
+            console.log('handleAddCanvasContext: OCR returned text length:', ocrText.length);
+            if (ocrText) {
+                contentToAdd = contentToAdd
+                    ? `${contentToAdd}\n\n--- Extracted from Images ---\n${ocrText}`
+                    : ocrText;
+            }
+        }
+
+        console.log('handleAddCanvasContext: Final content length:', contentToAdd.length);
+
+        if (contentToAdd) {
             addContextSource({
                 type: 'canvas',
-                content: extractedText,
+                content: contentToAdd,
                 metadata: {
                     nodeIds: selection.nodes.map((n) => n.id),
                     timestamp: Date.now(),
+                    hasOCR: hasImages,
                 },
             });
+            console.log('handleAddCanvasContext: Context source added successfully');
+        } else {
+            console.warn('handleAddCanvasContext: No content to add!');
         }
     };
 
@@ -61,6 +185,7 @@ export function ContextStep() {
     }, [addContextSource]);
 
     const hasContext = context.sources.length > 0;
+    const canAddCanvas = extractedText || hasImages;
 
     return (
         <div className="space-y-4">
@@ -92,7 +217,7 @@ export function ContextStep() {
                         <CardHeader className="py-3">
                             <CardTitle className="text-sm">Canvas Selection</CardTitle>
                             <CardDescription className="text-xs">
-                                Select frames, sections, or text on your canvas
+                                Select frames, sections, text, or images on your canvas
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-0">
@@ -101,27 +226,60 @@ export function ContextStep() {
                                     <div className="p-3 bg-muted rounded-md text-sm max-h-32 overflow-y-auto">
                                         <p className="text-xs text-muted-foreground mb-1">
                                             {selection.nodes.length} element(s) selected
+                                            {hasImages && (
+                                                <Badge variant="outline" className="ml-2 text-xs">
+                                                    <Image className="h-2 w-2 mr-1" />
+                                                    Images detected
+                                                </Badge>
+                                            )}
                                         </p>
                                         {extractedText ? (
                                             <p className="whitespace-pre-wrap">{extractedText.slice(0, 500)}...</p>
+                                        ) : hasImages ? (
+                                            <p className="text-muted-foreground italic">
+                                                Images will be processed with OCR to extract text
+                                            </p>
                                         ) : (
                                             <p className="text-muted-foreground italic">No text content found</p>
                                         )}
                                     </div>
+
+                                    {isProcessingOCR && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                <span>{ocrStatus}</span>
+                                            </div>
+                                            <Progress value={ocrProgress} className="h-2" />
+                                        </div>
+                                    )}
+
                                     <Button
                                         onClick={handleAddCanvasContext}
-                                        disabled={!extractedText}
+                                        disabled={!canAddCanvas || isProcessingOCR}
                                         size="sm"
                                         className="w-full"
                                     >
-                                        Add to Context
+                                        {isProcessingOCR ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                Processing...
+                                            </>
+                                        ) : hasImages && !extractedText ? (
+                                            <>
+                                                <Image className="h-4 w-4 mr-2" />
+                                                Extract Text from Images
+                                            </>
+                                        ) : (
+                                            'Add to Context'
+                                        )}
                                     </Button>
                                 </div>
                             ) : (
                                 <div className="text-center py-6 text-muted-foreground">
                                     <MousePointer2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                     <p className="text-sm">Select elements on your canvas</p>
-                                    <p className="text-xs">Text will be extracted automatically</p>
+                                    <p className="text-xs">Text and images will be processed</p>
                                 </div>
                             )}
                         </CardContent>
@@ -191,6 +349,12 @@ export function ContextStep() {
                                             <span className="text-xs text-muted-foreground truncate">
                                                 {source.metadata.fileName}
                                             </span>
+                                        )}
+                                        {source.metadata.hasOCR && (
+                                            <Badge variant="secondary" className="text-xs">
+                                                <Image className="h-2 w-2 mr-1" />
+                                                OCR
+                                            </Badge>
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground line-clamp-2">

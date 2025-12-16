@@ -39,10 +39,6 @@ export function StartNewDialog({ open, onOpenChange }: StartNewDialogProps) {
         }, waitTime);
     };
 
-    const handleCancel = () => {
-        onOpenChange(false);
-    };
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
@@ -81,12 +77,12 @@ export function StartNewDialog({ open, onOpenChange }: StartNewDialogProps) {
 
                 <DialogFooter className="flex-col sm:flex-row gap-2">
                     <Button
-                        variant="outline"
-                        onClick={handleCancel}
+                        variant="destructive"
+                        onClick={() => { resetProject(); onOpenChange(false); }}
                         className="w-full sm:w-auto"
                     >
                         <X className="h-4 w-4 mr-2" />
-                        Cancel
+                        Reset
                     </Button>
 
                     {hasObjects && (

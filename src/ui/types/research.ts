@@ -19,6 +19,7 @@ export interface ContextSource {
         fileType?: string;
         nodeIds?: string[];
         timestamp: number;
+        hasOCR?: boolean;
     };
 }
 

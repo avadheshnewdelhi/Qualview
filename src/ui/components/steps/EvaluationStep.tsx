@@ -56,31 +56,80 @@ export function EvaluationStep() {
     );
     const [responses, setResponses] = useState<ParsedResponse[]>([]);
 
-    const handleFileProcessed = useCallback((content: string, _fileName: string) => {
-        // Parse CSV-like response data
-        const lines = content.split('\n').filter(l => l.trim());
-        if (lines.length < 2) return;
+    const handleFileProcessed = useCallback((content: string, fileName: string) => {
+        // Parse response data - supports multiple formats:
+        // Format 1: Plain text with "Q#: answer" lines (from Qualview export)
+        // Format 2: CSV with headers
 
-        const headers = lines[0].split(',').map(h => h.trim());
-        const parsed: ParsedResponse[] = [];
+        const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.length < 2) {
+            console.warn('File has less than 2 lines:', fileName);
+            return;
+        }
 
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim());
-            const answers: Record<string, string> = {};
+        const answers: Record<string, string> = {};
+        let participantId = fileName.replace(/\.[^/.]+$/, ''); // Default to filename
+
+        // Check if first line is a participant header (like "Participant 1")
+        const firstLine = lines[0].toLowerCase();
+        const participantMatch = lines[0].match(/^participant\s*(\d+|[a-z_\-]+)/i);
+
+        if (participantMatch) {
+            participantId = participantMatch[0].replace(/\s+/g, '_');
+        } else if (firstLine.includes('participantid') || firstLine.includes(',')) {
+            // This looks like CSV format - try CSV parsing
+            console.log('Detected CSV format for:', fileName);
+            // Use simple CSV parsing as fallback
+            const headers = lines[0].split(',').map(h => h.trim());
+            const values = lines[1].split(',').map(v => v.trim());
 
             headers.forEach((header, idx) => {
                 if (header.toLowerCase() !== 'participantid' && header.toLowerCase() !== 'id') {
-                    answers[header] = values[idx] || '';
+                    if (values[idx]) answers[header] = values[idx];
                 }
             });
 
-            parsed.push({
-                participantId: values[0] || `P${i}`,
-                answers,
-            });
+            const idIdx = headers.findIndex(h => h.toLowerCase() === 'participantid' || h.toLowerCase() === 'id');
+            if (idIdx >= 0 && values[idIdx]) {
+                participantId = values[idIdx];
+            }
         }
 
-        setResponses(prev => [...prev, ...parsed].slice(0, 50)); // Max 50 responses
+        // Parse Q#: answer format (primary format from Qualview export)
+        for (const line of lines) {
+            // Match patterns like "Q1:", "Q1 :", "q1:", etc.
+            const qMatch = line.match(/^(Q\d+)\s*:\s*(.+)$/i);
+            if (qMatch) {
+                const questionId = qMatch[1].toLowerCase(); // Normalize to lowercase
+                const answer = qMatch[2].trim();
+                if (answer) {
+                    answers[questionId] = answer;
+                }
+            }
+        }
+
+        console.log(`Processing ${fileName}:`, { participantId, answerCount: Object.keys(answers).length });
+        console.log(`Parsed ${participantId}:`, answers);
+
+        if (Object.keys(answers).length === 0) {
+            console.warn('No answers parsed from file:', fileName);
+            return;
+        }
+
+        const parsed: ParsedResponse = {
+            participantId,
+            answers,
+        };
+
+        // Add participant (avoid duplicates)
+        setResponses(prev => {
+            const exists = prev.some(p => p.participantId === participantId);
+            if (exists) {
+                console.warn('Duplicate participant:', participantId);
+                return prev;
+            }
+            return [...prev, parsed];
+        });
     }, []);
 
     const handleEvaluate = async () => {

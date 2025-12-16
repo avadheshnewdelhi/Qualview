@@ -30,7 +30,7 @@ export async function generateCompletion<T>(
         model: settings.model,
         response_format: { type: 'json_object' },
         temperature: 0.7,
-        max_tokens: 4096,
+        max_tokens: 16384, // Increased for larger responses (many participants)
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },

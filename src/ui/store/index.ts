@@ -112,7 +112,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // Initial State
     ui: initialUI,
     context: initialContext,
-    canvasSelection: { nodes: [], extractedText: '' },
+    canvasSelection: { nodes: [], extractedText: '', hasImages: false },
     researchObjects: [],
     transcripts: [],
     settings: null,
@@ -289,7 +289,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // Reset local state
         set({
             context: initialContext,
-            canvasSelection: { nodes: [], extractedText: '' },
+            canvasSelection: { nodes: [], extractedText: '', hasImages: false },
             researchObjects: [],
             transcripts: [],
             ui: {

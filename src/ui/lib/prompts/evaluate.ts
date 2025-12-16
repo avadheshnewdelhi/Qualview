@@ -1,12 +1,12 @@
 import type { ScreenerContent } from '@/types';
 
 interface ParticipantResponse {
-    participantId: string;
-    answers: Record<string, string>;
+  participantId: string;
+  answers: Record<string, string>;
 }
 
 export const evaluatePrompt = {
-    system: `You are an expert UX researcher evaluating screener responses to identify qualified research participants.
+  system: `You are an expert UX researcher evaluating screener responses to identify qualified research participants.
 
 For each participant, analyze their responses to:
 1. Check for KNOCKOUT criteria matches
@@ -41,10 +41,10 @@ Respond with a JSON object matching this exact structure:
 
 Flag types: knockout_hit, inconsistent_responses, generic_answers, suspected_gaming, low_quality`,
 
-    buildUserPrompt: (
-        screener: ScreenerContent,
-        responses: ParticipantResponse[]
-    ): string => `
+  buildUserPrompt: (
+    screener: ScreenerContent,
+    responses: ParticipantResponse[]
+  ): string => `
 Screener Questions:
 ${screener.questions.map((q) => `
 ${q.id}. [${q.questionType}] ${q.question}
@@ -52,12 +52,12 @@ ${q.options ? `Options: ${q.options.join(', ')}` : 'Open-ended'}
 ${q.knockoutLogic ? `Knockout: ${q.knockoutLogic}` : ''}
 `).join('\n')}
 
-Participant Responses:
+Participant Responses (${responses.length} total - YOU MUST EVALUATE ALL ${responses.length} PARTICIPANTS):
 ${responses.map((r) => `
 Participant: ${r.participantId}
 ${Object.entries(r.answers).map(([qId, answer]) => `  ${qId}: ${answer}`).join('\n')}
 `).join('\n---\n')}
 
-Evaluate each participant and categorize them as qualified or disqualified.
+IMPORTANT: Evaluate ALL ${responses.length} participants listed above. Each participant must appear in either the "qualified" or "disqualified" array. Do not skip any participants.
 `,
 };
