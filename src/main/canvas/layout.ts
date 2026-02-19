@@ -42,9 +42,11 @@ export function getLayoutConfig(): LayoutConfig {
 }
 
 /**
- * Find all Qualview nodes on the current page
- * Looks for frames named "Qualview: *"
+ * Find all Qualview artifact nodes on the current page
+ * Matches frames by known type names (with or without legacy "Qualview:" prefix)
  */
+const KNOWN_TYPE_NAMES = ['Framing', 'Plan', 'Screener', 'Participants', 'Interview-guide', 'Insights'];
+
 export function findQualviewNodes(): SceneNode[] {
     const nodes: SceneNode[] = [];
 
@@ -56,9 +58,12 @@ export function findQualviewNodes(): SceneNode[] {
         }
     }
 
-    // Also find any existing Qualview frames on the page (from previous sessions)
+    // Also find existing artifact frames on the page (current or legacy naming)
     const pageNodes = figma.currentPage.findAll((node) =>
-        node.type === 'FRAME' && node.name.startsWith('Qualview:')
+        node.type === 'FRAME' && (
+            node.name.startsWith('Qualview:') ||
+            KNOWN_TYPE_NAMES.includes(node.name)
+        )
     );
 
     // Combine and deduplicate
@@ -80,89 +85,42 @@ export function registerInsertedNode(nodeId: string): void {
 }
 
 /**
- * Calculate next available position based on existing Qualview objects
- * Uses a horizontal flow layout that wraps to next row when needed
+ * Calculate next available position — always places horizontally to the right
+ * with 100px gutters between artifacts
  */
 export function getNextPosition(
     existingNodes: SceneNode[],
-    width: number,
-    height: number
+    _width: number,
+    _height: number
 ): { x: number; y: number } {
-    const layout = getLayoutConfig();
+    const GUTTER = 100; // Consistent 100px spacing between artifacts
 
-    // If no existing nodes, start at a consistent position
+    // If no existing nodes, start at viewport center
     if (existingNodes.length === 0) {
-        // Use viewport center as starting point, but snap to grid
         const viewport = figma.viewport.center;
-        const startX = layout.mode === 'grid'
-            ? Math.round(viewport.x / layout.gridSize) * layout.gridSize
-            : viewport.x;
-        const startY = layout.mode === 'grid'
-            ? Math.round(viewport.y / layout.gridSize) * layout.gridSize
-            : viewport.y;
-
-        return { x: startX, y: startY };
+        return { x: Math.round(viewport.x), y: Math.round(viewport.y) };
     }
 
-    // Find the bounding box of all existing nodes
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    // Find the rightmost edge and top-alignment of existing nodes
+    let maxRight = -Infinity;
+    let topY = Infinity;
 
     for (const node of existingNodes) {
-        if ('x' in node && 'y' in node && 'width' in node && 'height' in node) {
-            minX = Math.min(minX, node.x);
-            minY = Math.min(minY, node.y);
-            maxX = Math.max(maxX, node.x + (node.width || 0));
-            maxY = Math.max(maxY, node.y + (node.height || 0));
+        if ('x' in node && 'y' in node && 'width' in node) {
+            const right = node.x + (node.width || 0);
+            if (right > maxRight) {
+                maxRight = right;
+            }
+            if (node.y < topY) {
+                topY = node.y;
+            }
         }
     }
 
-    if (layout.mode === 'grid') {
-        // Grid layout: place to the right of the last node
-        // If too wide for viewport, wrap to next row
-        const newX = maxX + layout.gutterX;
-        const viewportRight = figma.viewport.center.x + figma.viewport.bounds.width / 2;
-
-        // Check if new position would go too far right (more than 2000px from start)
-        const maxRowWidth = 1600; // Allow up to 4 frames per row @ 400px each
-        const rowWidth = newX - minX + width;
-
-        if (rowWidth > maxRowWidth) {
-            // Wrap to next row
-            return {
-                x: minX,
-                y: maxY + layout.gutterY,
-            };
-        }
-
-        // Find the Y position - align with the top of existing nodes in this row
-        // Get nodes that are roughly at the same Y level
-        const rowNodes = existingNodes.filter(n => {
-            if (!('y' in n)) return false;
-            return Math.abs(n.y - minY) < 50 || Math.abs(n.y - (maxY - (n.height || 0))) < 50;
-        });
-
-        // Use the topmost Y of the rightmost column
-        const rightmostNode = existingNodes.reduce((rightmost, node) => {
-            if (!('x' in node)) return rightmost;
-            if (!rightmost || node.x > (rightmost as SceneNode & { x: number }).x) return node;
-            return rightmost;
-        }, null as SceneNode | null);
-
-        const alignY = rightmostNode && 'y' in rightmostNode ? rightmostNode.y : minY;
-
-        return {
-            x: newX,
-            y: alignY as number,
-        };
-    }
-
-    // Clustered layout (FigJam): place to the right with slight diagonal offset
+    // Place to the right of the rightmost node, aligned to top
     return {
-        x: maxX + layout.gutterX,
-        y: minY + (existingNodes.length % 3) * 50, // Slight stagger
+        x: maxRight + GUTTER,
+        y: topY,
     };
 }
 

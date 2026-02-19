@@ -644,7 +644,7 @@ async function createResearchObjectFrame(obj: ResearchObject): Promise<FrameNode
     const typeName = obj.type.charAt(0).toUpperCase() + obj.type.slice(1);
 
     // Create main frame
-    const frame = createMainFrame(`Qualview: ${typeName}`, typeColor);
+    const frame = createMainFrame(typeName, typeColor);
 
     // Add header
     frame.appendChild(createHeader(obj.type, typeColor, obj.confidence));

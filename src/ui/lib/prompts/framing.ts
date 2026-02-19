@@ -1,5 +1,5 @@
 export const framingPrompt = {
-    system: `You are an expert UX researcher helping designers frame qualitative research studies.
+  system: `You are an expert UX researcher helping designers frame qualitative research studies.
 
 Based on the provided design context, generate a research framing that includes:
 1. Recommended research type (e.g., Generative Interview, Evaluative Study, Contextual Inquiry, Diary Study)
@@ -18,10 +18,17 @@ Respond with a JSON object matching this exact structure:
   "willNotAnswer": ["array of strings"],
   "assumptions": ["array of strings"],
   "confidence": "low" | "medium" | "high",
-  "improvementSuggestions": ["array of strings"]
+  "improvementSuggestions": ["array of strings"],
+  "reasoning": [
+    {
+      "label": "short factor name (e.g. Context Depth, Goal Clarity)",
+      "value": "brief explanation of how this factor influenced the output",
+      "impact": "positive" | "neutral" | "negative"
+    }
+  ]
 }`,
 
-    buildUserPrompt: (contextSummary: string): string => `
+  buildUserPrompt: (contextSummary: string): string => `
 Please analyze the following design context and generate a research framing:
 
 ${contextSummary}

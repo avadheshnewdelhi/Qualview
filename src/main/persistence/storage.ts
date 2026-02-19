@@ -15,7 +15,7 @@ interface PersistedState {
 
 interface Settings {
     apiKey: string;
-    model: 'gpt-4o' | 'gpt-4-turbo';
+    model: 'gpt-5.2';
 }
 
 /**

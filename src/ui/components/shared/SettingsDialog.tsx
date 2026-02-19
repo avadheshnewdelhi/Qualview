@@ -16,12 +16,9 @@ export function SettingsDialog() {
     const { ui, settings, setSettings, setSettingsOpen } = useStore();
     const [apiKey, setApiKey] = useState(settings?.apiKey || '');
     const [showKey, setShowKey] = useState(false);
-    const [model, setModel] = useState<'gpt-4o' | 'gpt-4-turbo'>(
-        settings?.model || 'gpt-4o'
-    );
 
     const handleSave = () => {
-        setSettings({ apiKey, model });
+        setSettings({ apiKey, model: 'gpt-5.2' });
         setSettingsOpen(false);
     };
 
@@ -68,28 +65,9 @@ export function SettingsDialog() {
                         </p>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Model</label>
-                        <div className="flex gap-2">
-                            <Button
-                                variant={model === 'gpt-4o' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setModel('gpt-4o')}
-                                className="flex-1"
-                            >
-                                GPT-4o
-                            </Button>
-                            <Button
-                                variant={model === 'gpt-4-turbo' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setModel('gpt-4-turbo')}
-                                className="flex-1"
-                            >
-                                GPT-4 Turbo
-                            </Button>
-                        </div>
+                    <div className="rounded-md bg-muted/50 p-3">
                         <p className="text-xs text-muted-foreground">
-                            GPT-4o is recommended for best results.
+                            <span className="font-medium text-foreground">Model:</span> GPT-5.2 (latest)
                         </p>
                     </div>
                 </div>

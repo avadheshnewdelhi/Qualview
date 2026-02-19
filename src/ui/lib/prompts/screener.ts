@@ -1,7 +1,7 @@
 import type { PlanContent } from '@/types';
 
 export const screenerPrompt = {
-    system: `You are an expert UX researcher specializing in participant screening for qualitative research.
+  system: `You are an expert UX researcher specializing in participant screening for qualitative research.
 
 Generate screener questions that:
 1. Use INDIRECT and SCENARIO-BASED questions to reduce gaming
@@ -28,12 +28,19 @@ Respond with a JSON object matching this exact structure:
     }
   ],
   "confidence": "low" | "medium" | "high",
-  "improvementSuggestions": ["array of strings"]
+  "improvementSuggestions": ["array of strings"],
+  "reasoning": [
+    {
+      "label": "short factor name (e.g. Question Coverage, Knockout Strength)",
+      "value": "brief explanation",
+      "impact": "positive" | "neutral" | "negative"
+    }
+  ]
 }
 
 Generate 6-10 questions covering a mix of types.`,
 
-    buildUserPrompt: (contextSummary: string, plan: PlanContent): string => `
+  buildUserPrompt: (contextSummary: string, plan: PlanContent): string => `
 Research Context:
 ${contextSummary}
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,6 @@ import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { FileUpload } from '@/components/context/FileUpload';
 import {
     Sparkles,
-    Save,
     ArrowRight,
     Layers,
     Lightbulb,
@@ -16,16 +15,18 @@ import {
     AlertCircle,
     CheckCircle,
     XCircle,
-    AlertTriangle
+    AlertTriangle,
+    Loader2
 } from 'lucide-react';
 import { generateCompletion } from '@/lib/openai';
 import { evaluatePrompt } from '@/lib/prompts';
+import { parseResponseWithAI } from '@/lib/prompts/parseResponse';
 import type { ParticipantsContent, ScreenerContent, ConfidenceLevel, Participant } from '@/types';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
-interface ParsedResponse {
-    participantId: string;
-    answers: Record<string, string>;
+interface PendingFile {
+    content: string;
+    fileName: string;
 }
 
 export function EvaluationStep() {
@@ -37,7 +38,9 @@ export function EvaluationStep() {
         getResearchObject,
         insertToCanvas,
         setCurrentStep,
-        setSettingsOpen
+        setSettingsOpen,
+        uploadedResponses,
+        addUploadedResponse,
     } = useStore();
 
     const isOnline = useOnlineStatus();
@@ -54,82 +57,63 @@ export function EvaluationStep() {
     const [suggestions, setSuggestions] = useState<string[]>(
         existingParticipants?.improvementSuggestions || []
     );
-    const [responses, setResponses] = useState<ParsedResponse[]>([]);
 
-    const handleFileProcessed = useCallback((content: string, fileName: string) => {
-        // Parse response data - supports multiple formats:
-        // Format 1: Plain text with "Q#: answer" lines (from Qualview export)
-        // Format 2: CSV with headers
+    // Queue for files pending AI parsing
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+    const [isParsing, setIsParsing] = useState(false);
+    const [parseProgress, setParseProgress] = useState({ current: 0, total: 0 });
 
-        const lines = content.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length < 2) {
-            console.warn('File has less than 2 lines:', fileName);
-            return;
-        }
+    // Process pending files with AI
+    useEffect(() => {
+        if (pendingFiles.length === 0 || isParsing || !settings?.apiKey) return;
 
-        const answers: Record<string, string> = {};
-        let participantId = fileName.replace(/\.[^/.]+$/, ''); // Default to filename
+        const processQueue = async () => {
+            setIsParsing(true);
 
-        // Check if first line is a participant header (like "Participant 1")
-        const firstLine = lines[0].toLowerCase();
-        const participantMatch = lines[0].match(/^participant\s*(\d+|[a-z_\-]+)/i);
+            // Capture snapshot of files to process
+            const filesToProcess = [...pendingFiles];
+            const processedFileNames = new Set<string>();
 
-        if (participantMatch) {
-            participantId = participantMatch[0].replace(/\s+/g, '_');
-        } else if (firstLine.includes('participantid') || firstLine.includes(',')) {
-            // This looks like CSV format - try CSV parsing
-            console.log('Detected CSV format for:', fileName);
-            // Use simple CSV parsing as fallback
-            const headers = lines[0].split(',').map(h => h.trim());
-            const values = lines[1].split(',').map(v => v.trim());
+            setParseProgress({ current: 0, total: filesToProcess.length });
 
-            headers.forEach((header, idx) => {
-                if (header.toLowerCase() !== 'participantid' && header.toLowerCase() !== 'id') {
-                    if (values[idx]) answers[header] = values[idx];
-                }
-            });
+            for (let i = 0; i < filesToProcess.length; i++) {
+                const file = filesToProcess[i];
+                setParseProgress({ current: i + 1, total: filesToProcess.length });
 
-            const idIdx = headers.findIndex(h => h.toLowerCase() === 'participantid' || h.toLowerCase() === 'id');
-            if (idIdx >= 0 && values[idIdx]) {
-                participantId = values[idIdx];
-            }
-        }
+                console.log(`AI parsing file ${i + 1}/${filesToProcess.length}: ${file.fileName}`);
 
-        // Parse Q#: answer format (primary format from Qualview export)
-        for (const line of lines) {
-            // Match patterns like "Q1:", "Q1 :", "q1:", etc.
-            const qMatch = line.match(/^(Q\d+)\s*:\s*(.+)$/i);
-            if (qMatch) {
-                const questionId = qMatch[1].toLowerCase(); // Normalize to lowercase
-                const answer = qMatch[2].trim();
-                if (answer) {
-                    answers[questionId] = answer;
+                const result = await parseResponseWithAI(file.content, file.fileName, settings);
+
+                if (result) {
+                    addUploadedResponse(result);
+                    processedFileNames.add(file.fileName);
+                } else {
+                    console.warn('Failed to parse:', file.fileName);
+                    processedFileNames.add(file.fileName); // Still remove failed ones
                 }
             }
-        }
 
-        console.log(`Processing ${fileName}:`, { participantId, answerCount: Object.keys(answers).length });
-        console.log(`Parsed ${participantId}:`, answers);
-
-        if (Object.keys(answers).length === 0) {
-            console.warn('No answers parsed from file:', fileName);
-            return;
-        }
-
-        const parsed: ParsedResponse = {
-            participantId,
-            answers,
+            // Only remove the files we just processed, keep any newly added files
+            setPendingFiles(prev => prev.filter(f => !processedFileNames.has(f.fileName)));
+            setIsParsing(false);
         };
 
-        // Add participant (avoid duplicates)
-        setResponses(prev => {
-            const exists = prev.some(p => p.participantId === participantId);
-            if (exists) {
-                console.warn('Duplicate participant:', participantId);
-                return prev;
-            }
-            return [...prev, parsed];
-        });
+        processQueue();
+    }, [pendingFiles, isParsing, settings, addUploadedResponse]);
+
+    const handleFileProcessed = useCallback((content: string, fileName: string) => {
+        console.log('=== EvaluationStep: handleFileProcessed called ===');
+        console.log('File:', fileName, 'Content length:', content.length);
+
+        // Skip files with no content
+        if (content.trim().length < 10) {
+            console.warn('File content too short:', fileName);
+            return;
+        }
+
+        // Add to pending files queue for AI parsing
+        setPendingFiles(prev => [...prev, { content, fileName }]);
+        console.log('File queued for AI parsing:', fileName);
     }, []);
 
     const handleEvaluate = async () => {
@@ -138,7 +122,7 @@ export function EvaluationStep() {
             return;
         }
 
-        if (!screener || responses.length === 0) {
+        if (!screener || uploadedResponses.length === 0) {
             setError('Please upload screener responses first');
             return;
         }
@@ -155,13 +139,14 @@ export function EvaluationStep() {
             const result = await generateCompletion<ParticipantsContent & { confidence: ConfidenceLevel; improvementSuggestions: string[] }>(
                 settings,
                 evaluatePrompt.system,
-                evaluatePrompt.buildUserPrompt(screener, responses)
+                evaluatePrompt.buildUserPrompt(screener, uploadedResponses)
             );
 
             const { confidence: newConfidence, improvementSuggestions, ...content } = result;
             setParticipants(content);
             setConfidence(newConfidence);
             setSuggestions(improvementSuggestions);
+            addResearchObject('participants', content, newConfidence, improvementSuggestions);
         } catch (err) {
             console.error('Evaluation error:', err);
             setError(err instanceof Error ? err.message : 'Failed to evaluate responses');
@@ -170,11 +155,7 @@ export function EvaluationStep() {
         }
     };
 
-    const handleSave = () => {
-        if (participants) {
-            addResearchObject('participants', participants, confidence, suggestions);
-        }
-    };
+
 
     const handleInsertToCanvas = () => {
         const obj = getResearchObject('participants');
@@ -226,25 +207,50 @@ export function EvaluationStep() {
                     </p>
                 </div>
 
+                {!settings?.apiKey && (
+                    <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <span>Add your OpenAI API key in settings to enable AI-powered response parsing</span>
+                    </div>
+                )}
+
+                {isParsing && (
+                    <Card>
+                        <CardContent className="py-4">
+                            <div className="flex items-center gap-3">
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        Parsing responses with AI... ({parseProgress.current}/{parseProgress.total})
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Extracting participant data from uploaded files
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <FileUpload
                     onFileProcessed={handleFileProcessed}
                     multiple={true}
                     maxFiles={25}
                     title="Upload Screener Responses"
-                    description="Upload CSV/Excel files with participant responses (up to 25 files)"
+                    description="Upload TXT/CSV files with participant responses (up to 25 files)"
                 />
 
-                {responses.length > 0 && (
+                {uploadedResponses.length > 0 && (
                     <Card>
                         <CardHeader className="py-3">
                             <CardTitle className="text-sm flex items-center gap-2">
                                 <Users className="h-4 w-4" />
-                                {responses.length} Response(s) Loaded
+                                {uploadedResponses.length} Response(s) Loaded
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0">
                             <div className="text-xs text-muted-foreground mb-3">
-                                Participants: {responses.map(r => r.participantId).join(', ')}
+                                Participants: {uploadedResponses.map(r => r.participantId).join(', ')}
                             </div>
 
                             {!settings?.apiKey && (
@@ -339,16 +345,10 @@ export function EvaluationStep() {
 
             <Separator />
 
-            <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleSave}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                </Button>
-                <Button className="flex-1" onClick={() => { handleSave(); setCurrentStep(5); }}>
-                    Create Interview Guide
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-            </div>
+            <Button className="w-full" onClick={() => setCurrentStep(5)}>
+                Create Interview Guide
+                <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
         </div>
     );
 }

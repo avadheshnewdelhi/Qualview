@@ -6,13 +6,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
+import { PromptRefiner } from '@/components/shared/PromptRefiner';
+import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
     RefreshCw,
-    Save,
     ArrowRight,
     Layers,
-    Lightbulb,
     AlertCircle
 } from 'lucide-react';
 import { generateCompletion, buildContextSummary } from '@/lib/openai';
@@ -46,6 +47,7 @@ export function ResearchFramingStep() {
         existingFraming?.improvementSuggestions || []
     );
     const [isEditing, setIsEditing] = useState(false);
+    const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleGenerate = async () => {
         if (!settings?.apiKey) {
@@ -63,16 +65,18 @@ export function ResearchFramingStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
-            const result = await generateCompletion<FramingContent & { confidence: ConfidenceLevel; improvementSuggestions: string[] }>(
+            const result = await generateCompletion<FramingContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 framingPrompt.system,
                 framingPrompt.buildUserPrompt(contextSummary)
             );
 
-            const { confidence: newConfidence, improvementSuggestions, ...content } = result;
+            const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
             setFraming(content);
             setConfidence(newConfidence);
             setSuggestions(improvementSuggestions);
+            setReasoning(newReasoning || []);
+            addResearchObject('framing', content, newConfidence, improvementSuggestions);
         } catch (err) {
             console.error('Generation error:', err);
             setError(err instanceof Error ? err.message : 'Failed to generate framing');
@@ -81,12 +85,7 @@ export function ResearchFramingStep() {
         }
     };
 
-    const handleSave = () => {
-        if (framing) {
-            const obj = addResearchObject('framing', framing, confidence, suggestions);
-            setIsEditing(false);
-        }
-    };
+
 
     const handleInsertToCanvas = () => {
         const obj = getResearchObject('framing');
@@ -151,6 +150,8 @@ export function ResearchFramingStep() {
                 </div>
                 <ConfidenceIndicator level={confidence} />
             </div>
+
+            <LogicPanel reasoning={reasoning} />
 
             <Card>
                 <CardHeader className="py-3">
@@ -223,25 +224,30 @@ export function ResearchFramingStep() {
                     </div>
                 </CardContent>
             </Card>
+            {/* Prompt Refiner */}
+            <PromptRefiner
+                artifactType="framing"
+                currentContent={framing}
+                onRefined={(newContent, newConfidence, newSuggestions) => {
+                    setFraming(newContent as FramingContent);
+                    setConfidence(newConfidence as ConfidenceLevel);
+                    setSuggestions(newSuggestions);
+                }}
+            />
 
-            {/* Improvement Suggestions */}
-            {suggestions.length > 0 && (
-                <Card className="bg-amber-50 border-amber-200">
-                    <CardHeader className="py-3">
-                        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
-                            <Lightbulb className="h-4 w-4" />
-                            To improve confidence
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                        <ul className="space-y-1">
-                            {suggestions.map((s, i) => (
-                                <li key={i} className="text-sm text-amber-700">• {s}</li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </Card>
-            )}
+            <SuggestionPanel
+                suggestions={suggestions}
+                artifactType="framing"
+                currentContent={framing}
+                onApplied={(newContent, newConf, newSuggestions) => {
+                    const conf = newConf as ConfidenceLevel;
+                    setFraming(newContent as FramingContent);
+                    setConfidence(conf);
+                    setSuggestions(newSuggestions);
+                    addResearchObject('framing', newContent, conf, newSuggestions);
+                }}
+                label="To improve confidence"
+            />
 
             {/* Actions */}
             <div className="flex gap-2">
@@ -260,16 +266,10 @@ export function ResearchFramingStep() {
 
             <Separator />
 
-            <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleSave}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                </Button>
-                <Button className="flex-1" onClick={() => { handleSave(); setCurrentStep(2); }}>
-                    Continue to Plan
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-            </div>
+            <Button className="w-full" onClick={() => setCurrentStep(2)}>
+                Continue to Plan
+                <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
         </div>
     );
 }

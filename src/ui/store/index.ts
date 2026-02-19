@@ -34,6 +34,12 @@ interface UIState {
     fileType: 'figma' | 'figjam';
 }
 
+// Uploaded response for evaluation
+export interface UploadedResponse {
+    participantId: string;
+    answers: Record<string, string>;
+}
+
 interface StoreState {
     // UI State
     ui: UIState;
@@ -47,6 +53,9 @@ interface StoreState {
 
     // Transcripts
     transcripts: Transcript[];
+
+    // Uploaded Responses for Evaluation
+    uploadedResponses: UploadedResponse[];
 
     // Settings
     settings: Settings | null;
@@ -77,6 +86,10 @@ interface StoreState {
     // Transcript Actions
     addTranscripts: (transcripts: Omit<Transcript, 'id'>[]) => void;
     removeTranscript: (id: string) => void;
+
+    // Uploaded Response Actions
+    addUploadedResponse: (response: UploadedResponse) => void;
+    clearUploadedResponses: () => void;
 
     // Settings Actions
     setSettings: (settings: Settings) => void;
@@ -115,6 +128,7 @@ export const useStore = create<StoreState>((set, get) => ({
     canvasSelection: { nodes: [], extractedText: '', hasImages: false },
     researchObjects: [],
     transcripts: [],
+    uploadedResponses: [],
     settings: null,
 
     // UI Actions
@@ -230,6 +244,22 @@ export const useStore = create<StoreState>((set, get) => ({
         set((state) => ({
             transcripts: state.transcripts.filter((t) => t.id !== id),
         })),
+
+    // Uploaded Response Actions
+    addUploadedResponse: (response) =>
+        set((state) => {
+            // Avoid duplicates
+            if (state.uploadedResponses.some(r => r.participantId === response.participantId)) {
+                console.warn('Duplicate participant:', response.participantId);
+                return state;
+            }
+            console.log('Store: Added response, total count:', state.uploadedResponses.length + 1);
+            return {
+                uploadedResponses: [...state.uploadedResponses, response],
+            };
+        }),
+
+    clearUploadedResponses: () => set({ uploadedResponses: [] }),
 
     // Settings Actions
     setSettings: (settings) => {

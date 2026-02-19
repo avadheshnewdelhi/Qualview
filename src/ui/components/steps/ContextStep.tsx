@@ -18,6 +18,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { FileUpload } from '@/components/context/FileUpload';
+import { ContextGuidance } from '@/components/shared/ContextGuidance';
 import { getOpenAIClient } from '@/lib/openai';
 import type { SelectionNode } from '@/types';
 
@@ -82,7 +83,7 @@ export function ContextStep() {
                 console.log(`OCR: Processing image ${i + 1}`);
 
                 const response = await client.chat.completions.create({
-                    model: 'gpt-4o',
+                    model: 'gpt-5.2',
                     max_tokens: 2000,
                     messages: [
                         {
@@ -195,6 +196,8 @@ export function ContextStep() {
                     Add context from your canvas, type it manually, or upload files.
                 </p>
             </div>
+
+            <ContextGuidance />
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="w-full">

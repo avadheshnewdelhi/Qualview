@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
+import { PromptRefiner } from '@/components/shared/PromptRefiner';
+import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
     RefreshCw,
-    Save,
     ArrowRight,
     Layers,
-    Lightbulb,
     Target,
     AlertCircle
 } from 'lucide-react';
@@ -48,6 +49,7 @@ export function ResearchPlanStep() {
         existingPlan?.improvementSuggestions || []
     );
     const [isEditing, setIsEditing] = useState(false);
+    const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleGenerate = async () => {
         if (!settings?.apiKey) {
@@ -70,16 +72,18 @@ export function ResearchPlanStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
-            const result = await generateCompletion<PlanContent & { confidence: ConfidenceLevel; improvementSuggestions: string[] }>(
+            const result = await generateCompletion<PlanContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 planPrompt.system,
                 planPrompt.buildUserPrompt(contextSummary, framing)
             );
 
-            const { confidence: newConfidence, improvementSuggestions, ...content } = result;
+            const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
             setPlan(content);
             setConfidence(newConfidence);
             setSuggestions(improvementSuggestions);
+            setReasoning(newReasoning || []);
+            addResearchObject('plan', content, newConfidence, improvementSuggestions);
         } catch (err) {
             console.error('Generation error:', err);
             setError(err instanceof Error ? err.message : 'Failed to generate plan');
@@ -88,12 +92,7 @@ export function ResearchPlanStep() {
         }
     };
 
-    const handleSave = () => {
-        if (plan) {
-            addResearchObject('plan', plan, confidence, suggestions);
-            setIsEditing(false);
-        }
-    };
+
 
     const handleInsertToCanvas = () => {
         const obj = getResearchObject('plan');
@@ -158,6 +157,8 @@ export function ResearchPlanStep() {
                 </div>
                 <ConfidenceIndicator level={confidence} />
             </div>
+
+            <LogicPanel reasoning={reasoning} />
 
             <Card>
                 <CardContent className="pt-6 space-y-4">
@@ -229,24 +230,30 @@ export function ResearchPlanStep() {
                 </CardContent>
             </Card>
 
-            {/* Improvement Suggestions */}
-            {suggestions.length > 0 && (
-                <Card className="bg-amber-50 border-amber-200">
-                    <CardHeader className="py-3">
-                        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
-                            <Lightbulb className="h-4 w-4" />
-                            To improve this plan
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                        <ul className="space-y-1">
-                            {suggestions.map((s, i) => (
-                                <li key={i} className="text-sm text-amber-700">• {s}</li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </Card>
-            )}
+            {/* Prompt Refiner */}
+            <PromptRefiner
+                artifactType="plan"
+                currentContent={plan}
+                onRefined={(newContent, newConfidence, newSuggestions) => {
+                    setPlan(newContent as PlanContent);
+                    setConfidence(newConfidence as ConfidenceLevel);
+                    setSuggestions(newSuggestions);
+                }}
+            />
+
+            <SuggestionPanel
+                suggestions={suggestions}
+                artifactType="plan"
+                currentContent={plan}
+                onApplied={(newContent, newConf, newSuggestions) => {
+                    const conf = newConf as ConfidenceLevel;
+                    setPlan(newContent as PlanContent);
+                    setConfidence(conf);
+                    setSuggestions(newSuggestions);
+                    addResearchObject('plan', newContent, conf, newSuggestions);
+                }}
+                label="To improve this plan"
+            />
 
             {/* Actions */}
             <div className="flex gap-2">
@@ -265,16 +272,10 @@ export function ResearchPlanStep() {
 
             <Separator />
 
-            <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleSave}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                </Button>
-                <Button className="flex-1" onClick={() => { handleSave(); setCurrentStep(3); }}>
-                    Continue to Screener
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-            </div>
+            <Button className="w-full" onClick={() => setCurrentStep(3)}>
+                Continue to Screener
+                <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
         </div>
     );
 }

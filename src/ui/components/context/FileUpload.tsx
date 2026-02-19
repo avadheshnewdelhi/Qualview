@@ -48,6 +48,8 @@ export function FileUpload({
     const [completedFiles, setCompletedFiles] = useState<string[]>([]);
 
     const processFile = useCallback(async (file: File): Promise<boolean> => {
+        console.log('FileUpload: processFile started for:', file.name, 'type:', file.type, 'size:', file.size);
+
         // Check file size
         if (file.size > maxSizeMB * 1024 * 1024) {
             setError(`${file.name} exceeds ${maxSizeMB}MB limit`);
@@ -67,6 +69,7 @@ export function FileUpload({
             if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
                 setProcessing(prev => prev ? { ...prev, status: 'Reading text file...' } : null);
                 content = await file.text();
+                console.log('FileUpload: Read text file content, length:', content.length);
             }
             // CSV files
             else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
@@ -130,7 +133,9 @@ export function FileUpload({
             }
 
             if (content.trim()) {
+                console.log('FileUpload: Calling onFileProcessed callback for:', file.name, 'content length:', content.length);
                 onFileProcessed(content, file.name);
+                console.log('FileUpload: onFileProcessed callback completed');
                 return true;
             } else {
                 setError(`${file.name}: No text content could be extracted`);

@@ -1,7 +1,7 @@
 import type { PlanContent, Transcript } from '@/types';
 
 export const synthesisPrompt = {
-    system: `You are an expert UX researcher synthesizing qualitative research data.
+  system: `You are an expert UX researcher synthesizing qualitative research data.
 
 Analyze the provided interview transcripts and generate:
 1. THEMATIC CLUSTERS - Group related findings into themes
@@ -34,14 +34,21 @@ Respond with a JSON object matching this exact structure:
   "opportunities": ["Opportunity statement 1", "Opportunity statement 2"],
   "hmwPrompts": ["How might we...", "How might we..."],
   "confidence": "low" | "medium" | "high",
-  "improvementSuggestions": ["array of strings"]
+  "improvementSuggestions": ["array of strings"],
+  "reasoning": [
+    {
+      "label": "short factor name (e.g. Transcript Coverage, Theme Saturation)",
+      "value": "brief explanation",
+      "impact": "positive" | "neutral" | "negative"
+    }
+  ]
 }`,
 
-    buildUserPrompt: (
-        contextSummary: string,
-        plan: PlanContent,
-        transcripts: Transcript[]
-    ): string => `
+  buildUserPrompt: (
+    contextSummary: string,
+    plan: PlanContent,
+    transcripts: Transcript[]
+  ): string => `
 Research Context:
 ${contextSummary}
 

@@ -3,13 +3,15 @@ import { useStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
+import { PromptRefiner } from '@/components/shared/PromptRefiner';
+import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import { FileUpload } from '@/components/context/FileUpload';
 import {
     Sparkles,
     RefreshCw,
-    Save,
     Layers,
     Lightbulb,
     FileText,
@@ -58,7 +60,7 @@ export function SynthesisStep() {
     const [suggestions, setSuggestions] = useState<string[]>(
         existingInsights?.improvementSuggestions || []
     );
-
+    const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
     const handleFileProcessed = useCallback((content: string, fileName: string) => {
         if (transcripts.length >= 25) {
             setError('Maximum 25 transcripts reached');
@@ -93,16 +95,18 @@ export function SynthesisStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
-            const result = await generateCompletion<InsightsContent & { confidence: ConfidenceLevel; improvementSuggestions: string[] }>(
+            const result = await generateCompletion<InsightsContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 synthesisPrompt.system,
                 synthesisPrompt.buildUserPrompt(contextSummary, plan, transcripts)
             );
 
-            const { confidence: newConfidence, improvementSuggestions, ...content } = result;
+            const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
             setInsights(content);
             setConfidence(newConfidence);
             setSuggestions(improvementSuggestions);
+            setReasoning(newReasoning || []);
+            addResearchObject('insights', content, newConfidence, improvementSuggestions);
         } catch (err) {
             console.error('Synthesis error:', err);
             setError(err instanceof Error ? err.message : 'Failed to synthesize insights');
@@ -111,11 +115,7 @@ export function SynthesisStep() {
         }
     };
 
-    const handleSave = () => {
-        if (insights) {
-            addResearchObject('insights', insights, confidence, suggestions);
-        }
-    };
+
 
     const handleInsertToCanvas = () => {
         const obj = getResearchObject('insights');
@@ -211,6 +211,8 @@ export function SynthesisStep() {
                 <ConfidenceIndicator level={confidence} />
             </div>
 
+            <LogicPanel reasoning={reasoning} />
+
             {/* Themes */}
             <div className="space-y-2">
                 <h3 className="text-sm font-medium flex items-center gap-2">
@@ -294,24 +296,30 @@ export function SynthesisStep() {
                 </div>
             )}
 
-            {/* Suggestions */}
-            {suggestions.length > 0 && (
-                <Card className="bg-amber-50 border-amber-200">
-                    <CardHeader className="py-3">
-                        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
-                            <Lightbulb className="h-4 w-4" />
-                            To strengthen these insights
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                        <ul className="space-y-1">
-                            {suggestions.map((s, i) => (
-                                <li key={i} className="text-sm text-amber-700">• {s}</li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </Card>
-            )}
+            <SuggestionPanel
+                suggestions={suggestions}
+                artifactType="insights"
+                currentContent={insights}
+                onApplied={(newContent, newConf, newSuggestions) => {
+                    const conf = newConf as ConfidenceLevel;
+                    setInsights(newContent as InsightsContent);
+                    setConfidence(conf);
+                    setSuggestions(newSuggestions);
+                    addResearchObject('insights', newContent, conf, newSuggestions);
+                }}
+                label="To strengthen these insights"
+            />
+
+            {/* Prompt Refiner */}
+            <PromptRefiner
+                artifactType="insights"
+                currentContent={insights}
+                onRefined={(newContent, newConfidence, newSuggestions) => {
+                    setInsights(newContent as InsightsContent);
+                    setConfidence(newConfidence as ConfidenceLevel);
+                    setSuggestions(newSuggestions);
+                }}
+            />
 
             {/* Actions */}
             <div className="flex gap-2">
@@ -325,12 +333,7 @@ export function SynthesisStep() {
                 </Button>
             </div>
 
-            <Separator />
 
-            <Button className="w-full" onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Insights
-            </Button>
         </div>
     );
 }

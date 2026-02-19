@@ -1,7 +1,7 @@
 import type { PlanContent, FramingContent } from '@/types';
 
 export const interviewPrompt = {
-    system: `You are an expert UX researcher creating interview guides for qualitative research.
+  system: `You are an expert UX researcher creating interview guides for qualitative research.
 
 Generate an interview guide with:
 1. WARM-UP section (2-3 easy, rapport-building questions)
@@ -35,14 +35,21 @@ Respond with a JSON object matching this exact structure:
     }
   ],
   "confidence": "low" | "medium" | "high",
-  "improvementSuggestions": ["array of strings"]
+  "improvementSuggestions": ["array of strings"],
+  "reasoning": [
+    {
+      "label": "short factor name",
+      "value": "brief explanation",
+      "impact": "positive" | "neutral" | "negative"
+    }
+  ]
 }`,
 
-    buildUserPrompt: (
-        contextSummary: string,
-        framing: FramingContent,
-        plan: PlanContent
-    ): string => `
+  buildUserPrompt: (
+    contextSummary: string,
+    framing: FramingContent,
+    plan: PlanContent
+  ): string => `
 Research Context:
 ${contextSummary}
 

@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
+import { PromptRefiner } from '@/components/shared/PromptRefiner';
+import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
     RefreshCw,
-    Save,
     ArrowRight,
     Layers,
-    Lightbulb,
     MessageSquare,
     AlertCircle
 } from 'lucide-react';
@@ -55,6 +56,7 @@ export function InterviewGuideStep() {
     const [suggestions, setSuggestions] = useState<string[]>(
         existingGuide?.improvementSuggestions || []
     );
+    const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleGenerate = async () => {
         if (!settings?.apiKey) {
@@ -77,16 +79,18 @@ export function InterviewGuideStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
-            const result = await generateCompletion<InterviewGuideContent & { confidence: ConfidenceLevel; improvementSuggestions: string[] }>(
+            const result = await generateCompletion<InterviewGuideContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 interviewPrompt.system,
                 interviewPrompt.buildUserPrompt(contextSummary, framing, plan)
             );
 
-            const { confidence: newConfidence, improvementSuggestions, ...content } = result;
+            const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
             setGuide(content);
             setConfidence(newConfidence);
             setSuggestions(improvementSuggestions);
+            setReasoning(newReasoning || []);
+            addResearchObject('interview-guide', content, newConfidence, improvementSuggestions);
         } catch (err) {
             console.error('Generation error:', err);
             setError(err instanceof Error ? err.message : 'Failed to generate interview guide');
@@ -95,11 +99,7 @@ export function InterviewGuideStep() {
         }
     };
 
-    const handleSave = () => {
-        if (guide) {
-            addResearchObject('interview-guide', guide, confidence, suggestions);
-        }
-    };
+
 
     const handleInsertToCanvas = () => {
         const obj = getResearchObject('interview-guide');
@@ -165,6 +165,8 @@ export function InterviewGuideStep() {
                 <ConfidenceIndicator level={confidence} />
             </div>
 
+            <LogicPanel reasoning={reasoning} />
+
             {guide.sections.map((section, sectionIdx) => (
                 <Card key={sectionIdx}>
                     <CardHeader className="py-3">
@@ -215,24 +217,30 @@ export function InterviewGuideStep() {
                 </Card>
             ))}
 
-            {/* Suggestions */}
-            {suggestions.length > 0 && (
-                <Card className="bg-amber-50 border-amber-200">
-                    <CardHeader className="py-3">
-                        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
-                            <Lightbulb className="h-4 w-4" />
-                            To improve this guide
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                        <ul className="space-y-1">
-                            {suggestions.map((s, i) => (
-                                <li key={i} className="text-sm text-amber-700">• {s}</li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </Card>
-            )}
+            {/* Prompt Refiner */}
+            <PromptRefiner
+                artifactType="interview-guide"
+                currentContent={guide}
+                onRefined={(newContent, newConfidence, newSuggestions) => {
+                    setGuide(newContent as InterviewGuideContent);
+                    setConfidence(newConfidence as ConfidenceLevel);
+                    setSuggestions(newSuggestions);
+                }}
+            />
+
+            <SuggestionPanel
+                suggestions={suggestions}
+                artifactType="interview-guide"
+                currentContent={guide}
+                onApplied={(newContent, newConf, newSuggestions) => {
+                    const conf = newConf as ConfidenceLevel;
+                    setGuide(newContent as InterviewGuideContent);
+                    setConfidence(conf);
+                    setSuggestions(newSuggestions);
+                    addResearchObject('interview-guide', newContent, conf, newSuggestions);
+                }}
+                label="To improve this guide"
+            />
 
             {/* Actions */}
             <div className="flex gap-2">
@@ -248,16 +256,10 @@ export function InterviewGuideStep() {
 
             <Separator />
 
-            <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleSave}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                </Button>
-                <Button className="flex-1" onClick={() => { handleSave(); setCurrentStep(6); }}>
-                    Synthesis
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-            </div>
+            <Button className="w-full" onClick={() => setCurrentStep(6)}>
+                Synthesis
+                <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
         </div>
     );
 }
