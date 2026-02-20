@@ -1,21 +1,19 @@
 import { useState } from 'react';
 import { useStore } from '@/store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
-import { PromptRefiner } from '@/components/shared/PromptRefiner';
+import { EditableCard } from '@/components/shared/EditableCard';
+import { EditPanel } from '@/components/shared/EditPanel';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
-import { StepContextInput } from '@/components/shared/StepContextInput';
 import { BiasCheckPanel } from '@/components/shared/BiasCheckPanel';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
-    RefreshCw,
     ArrowRight,
     Layers,
-    Lightbulb,
     ClipboardList,
     AlertCircle
 } from 'lucide-react';
@@ -59,6 +57,7 @@ export function ScreenerStep() {
     const [suggestions, setSuggestions] = useState<string[]>(
         existingScreener?.improvementSuggestions || []
     );
+    const [isEditing, setIsEditing] = useState(false);
     const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleGenerate = async () => {
@@ -104,8 +103,6 @@ export function ScreenerStep() {
         }
     };
 
-
-
     const handleInsertToCanvas = () => {
         const obj = getResearchObject('screener');
         if (obj) {
@@ -123,37 +120,39 @@ export function ScreenerStep() {
                     </p>
                 </div>
 
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="text-center space-y-4">
-                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                                <ClipboardList className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                                <h3 className="font-medium">Generate Screener Questions</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    AI will create indirect, scenario-based questions to reduce gaming
-                                </p>
-                            </div>
-
-                            {!settings?.apiKey && (
-                                <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                                    <span>Add your OpenAI API key in settings first</span>
-                                </div>
-                            )}
-
-                            <Button
-                                onClick={handleGenerate}
-                                className="w-full"
-                                disabled={!settings?.apiKey || !isOnline || !plan}
-                            >
-                                <Sparkles className="h-4 w-4 mr-2" />
-                                Generate Screener
-                            </Button>
+                <EditableCard
+                    isEditing={false}
+                    onEditToggle={() => { }}
+                    showEditIcon={false}
+                >
+                    <div className="text-center space-y-4">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                            <ClipboardList className="h-6 w-6 text-primary" />
                         </div>
-                    </CardContent>
-                </Card>
+                        <div>
+                            <h3 className="font-medium">Generate Screener Questions</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                AI will create indirect, scenario-based questions to reduce gaming
+                            </p>
+                        </div>
+
+                        {!settings?.apiKey && (
+                            <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                                <span>Add your OpenAI API key in settings first</span>
+                            </div>
+                        )}
+
+                        <Button
+                            onClick={handleGenerate}
+                            className="w-full"
+                            disabled={!settings?.apiKey || !isOnline || !plan}
+                        >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Generate Screener
+                        </Button>
+                    </div>
+                </EditableCard>
             </div>
         );
     }
@@ -172,53 +171,62 @@ export function ScreenerStep() {
 
             <LogicPanel reasoning={reasoning} />
 
-            <StepContextInput
-                stepKey="screener"
-                placeholder='e.g., "Participants must use iOS, not Android" or "Exclude employees of competitors"'
-            />
-
-            <div className="space-y-3">
-                {screener.questions.map((q, index) => (
-                    <Card key={q.id}>
-                        <CardHeader className="py-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">Q{index + 1}</span>
-                                <Badge className={QUESTION_TYPE_COLORS[q.questionType]}>
-                                    {q.questionType}
-                                </Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-0 space-y-2">
-                            <p className="text-sm font-medium">{q.question}</p>
-
-                            {q.options && q.options.length > 0 && (
-                                <div className="text-xs text-muted-foreground">
-                                    <span className="font-medium">Options: </span>
-                                    {q.options.join(' | ')}
+            <EditableCard
+                isEditing={isEditing}
+                onEditToggle={setIsEditing}
+                headerContent={
+                    <span className="text-xs text-muted-foreground">
+                        {screener.questions.length} questions
+                    </span>
+                }
+                editPanel={
+                    <EditPanel
+                        stepKey="screener"
+                        artifactType="screener"
+                        currentContent={screener}
+                        onUpdated={(newContent, newConf, newSuggestions) => {
+                            setScreener(newContent as ScreenerContent);
+                            setConfidence(newConf as ConfidenceLevel);
+                            setSuggestions(newSuggestions);
+                            addResearchObject('screener', newContent, newConf as ConfidenceLevel, newSuggestions);
+                        }}
+                        placeholder='e.g., "Add a knockout question about competitor usage" or "Make Q3 less leading"'
+                        contextPlaceholder='e.g., "Participants must use iOS, not Android" or "Exclude competitor employees"'
+                    />
+                }
+            >
+                <div className="space-y-3">
+                    {screener.questions.map((q, index) => (
+                        <Card key={q.id}>
+                            <CardHeader className="py-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-muted-foreground">Q{index + 1}</span>
+                                    <Badge className={QUESTION_TYPE_COLORS[q.questionType]}>
+                                        {q.questionType}
+                                    </Badge>
                                 </div>
-                            )}
+                            </CardHeader>
+                            <CardContent className="pt-0 space-y-2">
+                                <p className="text-sm font-medium">{q.question}</p>
 
-                            {q.knockoutLogic && (
-                                <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                                    <span className="font-medium">Knockout: </span>
-                                    {q.knockoutLogic}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+                                {q.options && q.options.length > 0 && (
+                                    <div className="text-xs text-muted-foreground">
+                                        <span className="font-medium">Options: </span>
+                                        {q.options.join(' | ')}
+                                    </div>
+                                )}
 
-            {/* Prompt Refiner */}
-            <PromptRefiner
-                artifactType="screener"
-                currentContent={screener}
-                onRefined={(newContent, newConfidence, newSuggestions) => {
-                    setScreener(newContent as ScreenerContent);
-                    setConfidence(newConfidence as ConfidenceLevel);
-                    setSuggestions(newSuggestions);
-                }}
-            />
+                                {q.knockoutLogic && (
+                                    <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                                        <span className="font-medium">Knockout: </span>
+                                        {q.knockoutLogic}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </EditableCard>
 
             <SuggestionPanel
                 suggestions={suggestions}
@@ -248,24 +256,19 @@ export function ScreenerStep() {
                 }}
             />
 
-            {/* Actions */}
-            <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleGenerate}>
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Regenerate
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleInsertToCanvas}>
-                    <Layers className="h-3 w-3 mr-1" />
-                    Insert to Canvas
-                </Button>
-            </div>
-
             <Separator />
 
-            <Button className="w-full" onClick={() => setCurrentStep(4)}>
-                Evaluate Responses
-                <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+            {/* CTA area: Insert to Canvas + Continue */}
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleInsertToCanvas}>
+                    <Layers className="h-4 w-4 mr-2" />
+                    Insert to Canvas
+                </Button>
+                <Button className="flex-1" onClick={() => setCurrentStep(4)}>
+                    Evaluate Responses
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+            </div>
         </div>
     );
 }
