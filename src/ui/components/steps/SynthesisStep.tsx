@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { PromptRefiner } from '@/components/shared/PromptRefiner';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { StepContextInput } from '@/components/shared/StepContextInput';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import { FileUpload } from '@/components/context/FileUpload';
 import {
@@ -43,7 +44,8 @@ export function SynthesisStep() {
         setSettingsOpen,
         transcripts,
         addTranscripts,
-        removeTranscript
+        removeTranscript,
+        getStepContext
     } = useStore();
 
     const isOnline = useOnlineStatus();
@@ -95,10 +97,12 @@ export function SynthesisStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
+            const stepCtx = getStepContext('synthesis');
+            const fullContext = stepCtx ? `${contextSummary}\n\nAdditional context for this step:\n${stepCtx}` : contextSummary;
             const result = await generateCompletion<InsightsContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 synthesisPrompt.system,
-                synthesisPrompt.buildUserPrompt(contextSummary, plan, transcripts)
+                synthesisPrompt.buildUserPrompt(fullContext, plan, transcripts)
             );
 
             const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
@@ -212,6 +216,11 @@ export function SynthesisStep() {
             </div>
 
             <LogicPanel reasoning={reasoning} />
+
+            <StepContextInput
+                stepKey="synthesis"
+                placeholder='e.g., "P3 mentioned accessibility issues off-the-record" or "Focus on onboarding friction"'
+            />
 
             {/* Themes */}
             <div className="space-y-2">

@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { PromptRefiner } from '@/components/shared/PromptRefiner';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { StepContextInput } from '@/components/shared/StepContextInput';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
@@ -37,7 +38,8 @@ export function InterviewGuideStep() {
         getResearchObject,
         insertToCanvas,
         setCurrentStep,
-        setSettingsOpen
+        setSettingsOpen,
+        getStepContext
     } = useStore();
 
     const isOnline = useOnlineStatus();
@@ -79,10 +81,12 @@ export function InterviewGuideStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
+            const stepCtx = getStepContext('interview');
+            const fullContext = stepCtx ? `${contextSummary}\n\nAdditional context for this step:\n${stepCtx}` : contextSummary;
             const result = await generateCompletion<InterviewGuideContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 interviewPrompt.system,
-                interviewPrompt.buildUserPrompt(contextSummary, framing, plan)
+                interviewPrompt.buildUserPrompt(fullContext, framing, plan)
             );
 
             const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
@@ -166,6 +170,11 @@ export function InterviewGuideStep() {
             </div>
 
             <LogicPanel reasoning={reasoning} />
+
+            <StepContextInput
+                stepKey="interview"
+                placeholder='e.g., "Ask about their onboarding experience specifically" or "Probe for accessibility issues"'
+            />
 
             {guide.sections.map((section, sectionIdx) => (
                 <Card key={sectionIdx}>

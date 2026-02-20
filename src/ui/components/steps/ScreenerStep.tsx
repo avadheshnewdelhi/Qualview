@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { PromptRefiner } from '@/components/shared/PromptRefiner';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { StepContextInput } from '@/components/shared/StepContextInput';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
@@ -39,7 +40,8 @@ export function ScreenerStep() {
         getResearchObject,
         insertToCanvas,
         setCurrentStep,
-        setSettingsOpen
+        setSettingsOpen,
+        getStepContext
     } = useStore();
 
     const isOnline = useOnlineStatus();
@@ -79,10 +81,12 @@ export function ScreenerStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
+            const stepCtx = getStepContext('screener');
+            const fullContext = stepCtx ? `${contextSummary}\n\nAdditional context for this step:\n${stepCtx}` : contextSummary;
             const result = await generateCompletion<ScreenerContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 screenerPrompt.system,
-                screenerPrompt.buildUserPrompt(contextSummary, plan)
+                screenerPrompt.buildUserPrompt(fullContext, plan)
             );
 
             const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
@@ -166,6 +170,11 @@ export function ScreenerStep() {
             </div>
 
             <LogicPanel reasoning={reasoning} />
+
+            <StepContextInput
+                stepKey="screener"
+                placeholder='e.g., "Participants must use iOS, not Android" or "Exclude employees of competitors"'
+            />
 
             <div className="space-y-3">
                 {screener.questions.map((q, index) => (

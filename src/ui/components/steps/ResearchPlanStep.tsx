@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { PromptRefiner } from '@/components/shared/PromptRefiner';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
+import { StepContextInput } from '@/components/shared/StepContextInput';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
@@ -31,7 +32,8 @@ export function ResearchPlanStep() {
         getResearchObject,
         insertToCanvas,
         setCurrentStep,
-        setSettingsOpen
+        setSettingsOpen,
+        getStepContext
     } = useStore();
 
     const isOnline = useOnlineStatus();
@@ -72,10 +74,12 @@ export function ResearchPlanStep() {
 
         try {
             const contextSummary = buildContextSummary(context);
+            const stepCtx = getStepContext('plan');
+            const fullContext = stepCtx ? `${contextSummary}\n\nAdditional context for this step:\n${stepCtx}` : contextSummary;
             const result = await generateCompletion<PlanContent & { confidence: ConfidenceLevel; improvementSuggestions: string[]; reasoning: ReasoningFactor[] }>(
                 settings,
                 planPrompt.system,
-                planPrompt.buildUserPrompt(contextSummary, framing)
+                planPrompt.buildUserPrompt(fullContext, framing)
             );
 
             const { confidence: newConfidence, improvementSuggestions, reasoning: newReasoning, ...content } = result;
@@ -159,6 +163,11 @@ export function ResearchPlanStep() {
             </div>
 
             <LogicPanel reasoning={reasoning} />
+
+            <StepContextInput
+                stepKey="plan"
+                placeholder='e.g., "We only have 2 weeks for recruitment" or "Budget is limited to $5k"'
+            />
 
             <Card>
                 <CardContent className="pt-6 space-y-4">

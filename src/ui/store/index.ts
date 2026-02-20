@@ -57,6 +57,9 @@ interface StoreState {
     // Uploaded Responses for Evaluation
     uploadedResponses: UploadedResponse[];
 
+    // Step-level context (additional context per step, persisted across tab switches)
+    stepContexts: Record<string, string>;
+
     // Settings
     settings: Settings | null;
 
@@ -94,6 +97,10 @@ interface StoreState {
     // Settings Actions
     setSettings: (settings: Settings) => void;
 
+    // Step Context Actions
+    setStepContext: (stepKey: string, value: string) => void;
+    getStepContext: (stepKey: string) => string;
+
     // Persistence
     initializeFromFigma: (state: PersistedState) => void;
     saveToFigma: () => void;
@@ -129,6 +136,7 @@ export const useStore = create<StoreState>((set, get) => ({
     researchObjects: [],
     transcripts: [],
     uploadedResponses: [],
+    stepContexts: {},
     settings: null,
 
     // UI Actions
@@ -266,6 +274,13 @@ export const useStore = create<StoreState>((set, get) => ({
         set({ settings });
         postMessage({ type: 'SAVE_SETTINGS', payload: settings });
     },
+
+    // Step Context Actions
+    setStepContext: (stepKey, value) =>
+        set((state) => ({
+            stepContexts: { ...state.stepContexts, [stepKey]: value },
+        })),
+    getStepContext: (stepKey) => get().stepContexts[stepKey] || '',
 
     // Persistence
     initializeFromFigma: (state) => {
