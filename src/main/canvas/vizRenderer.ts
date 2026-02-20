@@ -403,17 +403,20 @@ export async function renderVisualization(
     data: unknown
 ): Promise<VizInsertResult> {
     // The data payload is InsightsContent (or extended versions with extra fields)
-    const insightsData = (data as { content?: InsightsData })?.content || data as InsightsData;
+    const dataObj = data as Record<string, unknown>;
+    const insightsData = (dataObj && dataObj.content ? dataObj.content : data) as InsightsData;
 
     let frame: FrameNode;
     switch (vizType) {
         case 'theme-stories':
             frame = await renderThemeStories(insightsData);
             break;
-        case 'participant-heatmap':
+        case 'participant-heatmap': {
             // Heatmap passes { insights, participantIds, heatmap } but we only need insights
-            frame = await renderHeatmap((data as { insights?: InsightsData })?.insights || insightsData);
+            const heatmapData = (dataObj && dataObj.insights ? dataObj.insights : insightsData) as InsightsData;
+            frame = await renderHeatmap(heatmapData);
             break;
+        }
         case 'strength-ladder':
             frame = await renderStrengthLadder(insightsData);
             break;
