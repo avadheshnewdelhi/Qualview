@@ -8,17 +8,23 @@ import { SettingsDialog } from '@/components/shared/SettingsDialog';
 import { ResizeHandle } from '@/components/shared/ResizeHandle';
 import { postMessage } from '@/lib/figma';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function App() {
-    const { initializeFromFigma, setFileType, setSettings } = useStore();
+    const { initializeFromFigma, setFileType, setSignedIn } = useStore();
     const isOnline = useOnlineStatus();
+    const { user } = useAuth();
+
+    // Sync Firebase auth state → store
+    useEffect(() => {
+        setSignedIn(!!user);
+    }, [user, setSignedIn]);
 
     useEffect(() => {
         // Request initial data from Figma
         postMessage({ type: 'GET_PERSISTED_STATE' });
         postMessage({ type: 'GET_SELECTION' });
         postMessage({ type: 'GET_FILE_TYPE' });
-        postMessage({ type: 'GET_SETTINGS' });
 
         // Listen for messages from Figma
         const handleMessage = (event: MessageEvent) => {
@@ -34,11 +40,6 @@ export default function App() {
                 case 'FILE_TYPE':
                     setFileType(msg.payload);
                     break;
-                case 'SETTINGS_LOADED':
-                    if (msg.payload) {
-                        setSettings(msg.payload);
-                    }
-                    break;
                 case 'SELECTION_CHANGED':
                     useStore.getState().setCanvasSelection(msg.payload);
                     break;
@@ -53,7 +54,7 @@ export default function App() {
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [initializeFromFigma, setFileType, setSettings]);
+    }, [initializeFromFigma, setFileType]);
 
     return (
         <div className="flex flex-col h-screen relative">
@@ -66,4 +67,3 @@ export default function App() {
         </div>
     );
 }
-

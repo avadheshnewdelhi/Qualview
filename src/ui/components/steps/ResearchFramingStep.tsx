@@ -23,7 +23,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 export function ResearchFramingStep() {
     const {
         context,
-        settings,
+        settings, isSignedIn,
         setLoading,
         setError,
         addResearchObject,
@@ -49,7 +49,7 @@ export function ResearchFramingStep() {
     const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleGenerate = async () => {
-        if (!settings?.apiKey) {
+        if (!isSignedIn) {
             setSettingsOpen(true);
             return;
         }
@@ -117,17 +117,17 @@ export function ResearchFramingStep() {
                             </p>
                         </div>
 
-                        {!settings?.apiKey && (
+                        {!isSignedIn && (
                             <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                                <span>Add your OpenAI API key in settings first</span>
+                                <span>Sign in to use AI features</span>
                             </div>
                         )}
 
                         <Button
                             onClick={handleGenerate}
                             className="w-full"
-                            disabled={!settings?.apiKey || !isOnline}
+                            disabled={!isSignedIn || !isOnline}
                         >
                             <Sparkles className="h-4 w-4 mr-2" />
                             Generate Framing

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Qualview Login</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50 flex h-screen items-center justify-center p-4">
+    <div class="w-full max-w-sm rounded-[16px] bg-white p-8 shadow-sm border border-gray-100 text-center">
+        <div class="mx-auto w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <polyline points="10 17 15 12 10 7" />
+                <line x1="15" y1="12" x2="3" y2="12" />
+            </svg>
+        </div>
+        <h1 class="text-xl font-semibold mb-2 text-gray-900">Sign in to Qualview</h1>
+        <p class="text-[13px] text-gray-500 mb-6" id="status-text">Click the button below to sign in with your Google
+            account.</p>
+
+        <div id="loading-spinner"
+            class="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto hidden">
+        </div>
+
+        <p class="text-xs text-red-500 my-4 hidden" id="error-text"></p>
+
+        <button id="login-btn"
+            class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 w-full transition-colors flex items-center justify-center gap-2">
+            Sign in with Google
+        </button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: 'AIzaSyAHcRS-shTHe66_2A3PlpVsCcznkRp71TY',
+            authDomain: 'qualview-plugin.firebaseapp.com',
+            projectId: 'qualview-plugin',
+            storageBucket: 'qualview-plugin.firebasestorage.app',
+            messagingSenderId: '532460466990',
+            appId: '1:532460466990:web:d4f96152a83c4109f700bf'
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const statusEl = document.getElementById('status-text');
+        const spinner = document.getElementById('loading-spinner');
+        const errorEl = document.getElementById('error-text');
+        const loginBtn = document.getElementById('login-btn');
+
+        function showError(msg) {
+            spinner.classList.add('hidden');
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+            loginBtn.classList.remove('hidden');
+            loginBtn.textContent = 'Try Again';
+            statusEl.textContent = 'Authentication failed';
+        }
+
+        async function doLogin() {
+            try {
+                loginBtn.classList.add('hidden');
+                spinner.classList.remove('hidden');
+                errorEl.classList.add('hidden');
+                statusEl.textContent = 'Opening Google Sign-In...';
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const sessionId = urlParams.get('session');
+
+                if (!sessionId) {
+                    showError('Missing session ID. Please initiate login from the Figma plugin.');
+                    return;
+                }
+
+                const provider = new GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+
+                // 1. Sign in with Google
+                const result = await signInWithPopup(auth, provider);
+                statusEl.textContent = 'Securing session...';
+
+                // 2. Get the OAuth credential
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                if (!credential || !credential.idToken) {
+                    throw new Error("Could not retrieve Google ID token.");
+                }
+
+                // 3. Write directly to Firestore so the plugin can pick it up
+                await setDoc(doc(db, 'auth_sessions', sessionId), {
+                    idToken: credential.idToken,
+                    accessToken: credential.accessToken || null,
+                    uid: result.user.uid,
+                    timestamp: new Date().toISOString()
+                });
+
+                spinner.classList.add('hidden');
+                statusEl.innerHTML = '<span class="text-green-600 font-medium">Success!</span><br><br>You can close this window now and return to Figma. The plugin will update automatically.';
+            } catch (err) {
+                console.error(err);
+                if (err.code === 'auth/popup-closed-by-user') {
+                    showError('Sign-in popup was closed before completion.');
+                } else if (err.code === 'auth/popup-blocked') {
+                    showError('Popup was blocked by your browser. Please allow popups for this site.');
+                } else {
+                    showError(err.message || 'An unknown error occurred.');
+                }
+            }
+        }
+
+        loginBtn.addEventListener('click', doLogin);
+    </script>
+</body>
+
+</html>

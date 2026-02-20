@@ -5,8 +5,8 @@ import { useStore } from '@/store';
 import { StartNewDialog } from '@/components/shared/StartNewDialog';
 
 export function Header() {
-    const { setSettingsOpen, settings } = useStore();
-    const hasApiKey = !!settings?.apiKey;
+    const { setSettingsOpen, isSignedIn } = useStore();
+    const hasApiKey = isSignedIn;
     const [startNewOpen, setStartNewOpen] = useState(false);
 
     return (

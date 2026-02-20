@@ -5,3 +5,6 @@ export { evaluatePrompt } from './evaluate';
 export { interviewPrompt } from './interview';
 export { synthesisPrompt } from './synthesize';
 export { refinePrompt } from './refine';
+export { personaPrompt } from './persona';
+export { empathyMapPrompt } from './empathyMap';
+export { journeyMapPrompt } from './journeyMap';

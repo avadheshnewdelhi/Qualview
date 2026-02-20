@@ -27,8 +27,20 @@ Respond with a JSON object matching this exact structure:
     {
       "id": "insight1",
       "statement": "Clear insight statement",
-      "evidence": ["Quote or evidence 1", "Quote or evidence 2"],
-      "strength": "weak" | "moderate" | "strong"
+      "evidence": [
+        {
+          "quote": "Exact quote from transcript",
+          "participantId": "P1",
+          "emotion": "frustrated",
+          "sentiment": "negative",
+          "journeyStage": "onboarding",
+          "tags": ["usability", "error"]
+        }
+      ],
+      "strength": "weak" | "moderate" | "strong",
+      "severity": "low" | "medium" | "high" | "critical",
+      "businessImpact": "low" | "medium" | "high",
+      "confidenceScore": 85
     }
   ],
   "opportunities": ["Opportunity statement 1", "Opportunity statement 2"],

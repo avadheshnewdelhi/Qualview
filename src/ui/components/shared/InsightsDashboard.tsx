@@ -83,8 +83,10 @@ function extractParticipants(insights: Insight[]): string[] {
     const ids = new Set<string>();
     for (const ins of insights) {
         for (const ev of ins.evidence) {
-            const match = ev.match(/^P(\d+)/);
-            if (match) ids.add(match[1]);
+            if (ev.participantId) {
+                const match = ev.participantId.match(/^P?(\d+)/i);
+                if (match) ids.add(match[1]);
+            }
         }
     }
     return Array.from(ids).sort((a, b) => Number(a) - Number(b));
@@ -95,8 +97,8 @@ function getQuotesForCell(insights: Insight[], themeInsightIds: string[], pId: s
     for (const ins of insights) {
         if (!themeInsightIds.includes(ins.id)) continue;
         for (const ev of ins.evidence) {
-            if (ev.match(new RegExp(`^P${pId}[:\\s]`))) {
-                quotes.push(ev.replace(/^P\d+:\s*/, ''));
+            if (ev.participantId && ev.participantId.replace(/^P/i, '') === pId) {
+                quotes.push(ev.quote);
             }
         }
     }
@@ -108,7 +110,7 @@ function countForCell(insights: Insight[], themeInsightIds: string[], pId: strin
     for (const ins of insights) {
         if (!themeInsightIds.includes(ins.id)) continue;
         for (const ev of ins.evidence) {
-            if (ev.match(new RegExp(`^P${pId}[:\\s]`))) count++;
+            if (ev.participantId && ev.participantId.replace(/^P/i, '') === pId) count++;
         }
     }
     return count;
@@ -506,9 +508,8 @@ function InsightCard({
                 <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
                     <div className="space-y-2">
                         {insight.evidence.map((ev, i) => {
-                            const match = ev.match(/^P(\d+):\s*/);
-                            const pId = match ? `P${match[1]}` : '';
-                            const quote = ev.replace(/^P\d+:\s*/, '');
+                            const pId = ev.participantId || '';
+                            const quote = ev.quote;
                             return (
                                 <div key={i} className="flex gap-2 items-start">
                                     {pId && (
@@ -516,9 +517,30 @@ function InsightCard({
                                             {pId}
                                         </span>
                                     )}
-                                    <p className="text-[11px] text-muted-foreground italic leading-relaxed">
-                                        &ldquo;{quote}&rdquo;
-                                    </p>
+                                    <div className="flex-1">
+                                        <p className="text-[11px] text-muted-foreground italic leading-relaxed">
+                                            &ldquo;{quote}&rdquo;
+                                        </p>
+                                        {(ev.emotion || ev.sentiment || (ev.tags && ev.tags.length > 0)) && (
+                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                                {ev.emotion && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                                        {ev.emotion}
+                                                    </span>
+                                                )}
+                                                {ev.sentiment && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                                                        {ev.sentiment}
+                                                    </span>
+                                                )}
+                                                {ev.tags?.map(tag => (
+                                                    <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground border">
+                                                        #{tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}

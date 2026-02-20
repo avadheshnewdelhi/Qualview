@@ -5,10 +5,21 @@
   "main": "dist/code.js",
   "ui": "dist/index.html",
   "documentAccess": "dynamic-page",
-  "editorType": ["figma", "figjam"],
+  "editorType": [
+    "figma",
+    "figjam"
+  ],
   "networkAccess": {
-    "allowedDomains": ["https://api.openai.com"],
-    "reasoning": "Required for AI-powered research assistance via OpenAI API"
+    "allowedDomains": [
+      "https://api.openai.com",
+      "https://apis.google.com",
+      "https://*.googleapis.com",
+      "https://*.firebaseapp.com",
+      "https://*.cloudfunctions.net"
+    ],
+    "reasoning": "Required for AI capabilities via OpenAI/Cloud Functions and Authentication via Google APIs"
   },
-  "permissions": ["currentuser"]
+  "permissions": [
+    "currentuser"
+  ]
 }

@@ -29,7 +29,7 @@ export function EditPanel({
     placeholder,
     contextPlaceholder,
 }: EditPanelProps) {
-    const { settings, stepContexts, setStepContext } = useStore();
+    const { settings, isSignedIn, stepContexts, setStepContext } = useStore();
     const contextValue = stepContexts[stepKey] || '';
 
     const [instruction, setInstruction] = useState('');
@@ -52,7 +52,7 @@ export function EditPanel({
     }, []);
 
     const handleUpdate = useCallback(async () => {
-        if (!instruction.trim() || !settings?.apiKey) return;
+        if (!instruction.trim() || !isSignedIn) return;
 
         setIsUpdating(true);
         setError(null);

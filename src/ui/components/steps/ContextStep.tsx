@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { FileUpload } from '@/components/context/FileUpload';
 import { ContextGuidance } from '@/components/shared/ContextGuidance';
-import { getOpenAIClient } from '@/lib/openai';
+import { generateVisionCompletion } from '@/lib/openai';
 import type { SelectionNode } from '@/types';
 
 export function ContextStep() {
@@ -52,10 +52,10 @@ export function ContextStep() {
     // Process images with OCR using OpenAI Vision API
     // (Tesseract.js is blocked by Figma's Content Security Policy)
     const processImagesWithOCR = async (): Promise<string> => {
-        const { settings } = useStore.getState();
+        const { isSignedIn } = useStore.getState();
 
-        if (!settings?.apiKey) {
-            setOcrStatus('Please configure OpenAI API key in settings');
+        if (!isSignedIn) {
+            setOcrStatus('Please sign in to use AI features');
             return '';
         }
 
@@ -75,7 +75,6 @@ export function ContextStep() {
         setOcrStatus('Extracting text with AI Vision...');
 
         try {
-            const client = getOpenAIClient(settings);
             const ocrResults: string[] = [];
 
             for (let i = 0; i < images.length; i++) {
@@ -83,30 +82,10 @@ export function ContextStep() {
                 setOcrProgress(Math.round((i / images.length) * 100));
                 console.log(`OCR: Processing image ${i + 1}`);
 
-                const response = await client.chat.completions.create({
-                    model: 'gpt-5.2',
-                    max_tokens: 2000,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: 'Extract and transcribe ALL text visible in this image. Include any handwritten notes, sticky notes, labels, titles, and any other text. Preserve the original structure and formatting. Only return the extracted text, no commentary.'
-                                },
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: images[i],
-                                        detail: 'high'
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                });
-
-                const extractedText = response.choices[0]?.message?.content || '';
+                const extractedText = await generateVisionCompletion(
+                    images[i],
+                    'Extract and transcribe ALL text visible in this image. Include any handwritten notes, sticky notes, labels, titles, and any other text. Preserve the original structure and formatting. Only return the extracted text, no commentary.'
+                );
                 console.log(`OCR: Image ${i + 1} result:`, extractedText.slice(0, 100));
 
                 if (extractedText.trim()) {

@@ -63,7 +63,10 @@ interface StoreState {
     stepContexts: Record<string, string>;
 
     // Settings
-    settings: Settings | null;
+    settings: Settings;
+
+    // Auth
+    isSignedIn: boolean;
 
     // Bias check results (persisted across tab switches)
     biasCheckResults: Record<string, BiasCheckResult>;
@@ -104,6 +107,7 @@ interface StoreState {
 
     // Settings Actions
     setSettings: (settings: Settings) => void;
+    setSignedIn: (signedIn: boolean) => void;
 
     // Step Context Actions
     setStepContext: (stepKey: string, value: string) => void;
@@ -154,7 +158,8 @@ export const useStore = create<StoreState>((set, get) => ({
     stepContexts: {},
     biasCheckResults: {},
     previousVersions: {},
-    settings: null,
+    settings: { model: 'gpt-5.2' },
+    isSignedIn: false,
 
     // UI Actions
     setCurrentStep: (step) =>
@@ -287,10 +292,8 @@ export const useStore = create<StoreState>((set, get) => ({
     clearUploadedResponses: () => set({ uploadedResponses: [] }),
 
     // Settings Actions
-    setSettings: (settings) => {
-        set({ settings });
-        postMessage({ type: 'SAVE_SETTINGS', payload: settings });
-    },
+    setSettings: (settings) => set({ settings }),
+    setSignedIn: (signedIn) => set({ isSignedIn: signedIn }),
 
     // Step Context Actions
     setStepContext: (stepKey, value) =>

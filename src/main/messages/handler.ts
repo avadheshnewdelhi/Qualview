@@ -1,7 +1,7 @@
 /// <reference types="@figma/plugin-typings" />
 
 import { getSelectionData } from '../canvas/selection';
-import { loadState, saveState, loadSettings, saveSettings, clearState } from '../persistence/storage';
+import { loadState, saveState, clearState } from '../persistence/storage';
 import { insertResearchObject } from '../canvas/renderer';
 import { renderVisualization } from '../canvas/vizRenderer';
 
@@ -52,28 +52,6 @@ export async function handleMessage(msg: UIMessage): Promise<void> {
                 type: 'FILE_TYPE',
                 payload: fileType,
             });
-            break;
-        }
-
-        case 'GET_SETTINGS': {
-            const settings = await loadSettings();
-            figma.ui.postMessage({
-                type: 'SETTINGS_LOADED',
-                payload: settings,
-            });
-            break;
-        }
-
-        case 'SAVE_SETTINGS': {
-            const success = await saveSettings(msg.payload as Parameters<typeof saveSettings>[0]);
-            if (success) {
-                figma.ui.postMessage({ type: 'SETTINGS_SAVED' });
-            } else {
-                figma.ui.postMessage({
-                    type: 'ERROR',
-                    payload: { code: 'SAVE_FAILED', message: 'Failed to save settings' },
-                });
-            }
             break;
         }
 
@@ -137,6 +115,40 @@ export async function handleMessage(msg: UIMessage): Promise<void> {
             const finalWidth = Math.max(width, MIN_WIDTH);
             const finalHeight = Math.max(height, MIN_HEIGHT);
             figma.ui.resize(finalWidth, finalHeight);
+            break;
+        }
+
+        case 'SAVE_AUTH': {
+            try {
+                const { idToken } = msg.payload as { idToken: string };
+                await figma.clientStorage.setAsync('qualview_auth_token', idToken);
+                figma.ui.postMessage({ type: 'AUTH_SAVED' });
+            } catch (err) {
+                console.error('Failed to save auth to clientStorage', err);
+            }
+            break;
+        }
+
+        case 'GET_AUTH': {
+            try {
+                const idToken = await figma.clientStorage.getAsync('qualview_auth_token');
+                figma.ui.postMessage({
+                    type: 'AUTH_LOADED',
+                    payload: idToken ? { idToken } : null,
+                });
+            } catch (err) {
+                console.error('Failed to get auth from clientStorage', err);
+                figma.ui.postMessage({ type: 'AUTH_LOADED', payload: null });
+            }
+            break;
+        }
+
+        case 'CLEAR_AUTH': {
+            try {
+                await figma.clientStorage.deleteAsync('qualview_auth_token');
+            } catch (err) {
+                console.error('Failed to clear auth from clientStorage', err);
+            }
             break;
         }
 

@@ -31,7 +31,7 @@ interface PendingFile {
 
 export function EvaluationStep() {
     const {
-        settings,
+        settings, isSignedIn,
         setLoading,
         setError,
         addResearchObject,
@@ -65,7 +65,7 @@ export function EvaluationStep() {
 
     // Process pending files with AI
     useEffect(() => {
-        if (pendingFiles.length === 0 || isParsing || !settings?.apiKey) return;
+        if (pendingFiles.length === 0 || isParsing || !isSignedIn) return;
 
         const processQueue = async () => {
             setIsParsing(true);
@@ -117,7 +117,7 @@ export function EvaluationStep() {
     }, []);
 
     const handleEvaluate = async () => {
-        if (!settings?.apiKey) {
+        if (!isSignedIn) {
             setSettingsOpen(true);
             return;
         }
@@ -207,10 +207,10 @@ export function EvaluationStep() {
                     </p>
                 </div>
 
-                {!settings?.apiKey && (
+                {!isSignedIn && (
                     <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                        <span>Add your OpenAI API key in settings to enable AI-powered response parsing</span>
+                        <span>Sign in to enable AI-powered response parsing</span>
                     </div>
                 )}
 
@@ -253,17 +253,17 @@ export function EvaluationStep() {
                                 Participants: {uploadedResponses.map(r => r.participantId).join(', ')}
                             </div>
 
-                            {!settings?.apiKey && (
+                            {!isSignedIn && (
                                 <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2 mb-3">
                                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                                    <span>Add your OpenAI API key in settings first</span>
+                                    <span>Sign in to use AI features</span>
                                 </div>
                             )}
 
                             <Button
                                 onClick={handleEvaluate}
                                 className="w-full"
-                                disabled={!settings?.apiKey || !isOnline || !screener}
+                                disabled={!isSignedIn || !isOnline || !screener}
                             >
                                 <Sparkles className="h-4 w-4 mr-2" />
                                 Evaluate Responses

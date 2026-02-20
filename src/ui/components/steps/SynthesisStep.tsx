@@ -9,6 +9,7 @@ import { EditPanel } from '@/components/shared/EditPanel';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import { InsightsDashboard } from '@/components/shared/InsightsDashboard';
+import { ArtifactsGenerator } from '@/components/shared/ArtifactsGenerator';
 import { FileUpload } from '@/components/context/FileUpload';
 import {
     Sparkles,
@@ -20,7 +21,8 @@ import {
     Zap,
     HelpCircle,
     BarChart3,
-    List
+    List,
+    Shapes
 } from 'lucide-react';
 import { generateCompletion, buildContextSummary } from '@/lib/openai';
 import { synthesisPrompt } from '@/lib/prompts';
@@ -36,7 +38,7 @@ const STRENGTH_COLORS = {
 export function SynthesisStep() {
     const {
         context,
-        settings,
+        settings, isSignedIn,
         setLoading,
         setError,
         addResearchObject,
@@ -64,7 +66,7 @@ export function SynthesisStep() {
         existingInsights?.improvementSuggestions || []
     );
     const [isEditing, setIsEditing] = useState(false);
-    const [viewMode, setViewMode] = useState<'dashboard' | 'details'>('dashboard');
+    const [viewMode, setViewMode] = useState<'dashboard' | 'details' | 'visualizations'>('dashboard');
     const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleFileProcessed = useCallback((content: string, fileName: string) => {
@@ -76,7 +78,7 @@ export function SynthesisStep() {
     }, [transcripts.length, addTranscripts, setError]);
 
     const handleSynthesize = async () => {
-        if (!settings?.apiKey) {
+        if (!isSignedIn) {
             setSettingsOpen(true);
             return;
         }
@@ -173,17 +175,17 @@ export function SynthesisStep() {
                             </div>
                         ))}
 
-                        {!settings?.apiKey && (
+                        {!isSignedIn && (
                             <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2 mt-3">
                                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                                <span>Add your OpenAI API key in settings first</span>
+                                <span>Sign in to use AI features</span>
                             </div>
                         )}
 
                         <Button
                             onClick={handleSynthesize}
                             className="w-full mt-3"
-                            disabled={!settings?.apiKey || !isOnline || !plan}
+                            disabled={!isSignedIn || !isOnline || !plan}
                         >
                             <Sparkles className="h-4 w-4 mr-2" />
                             Synthesize Insights
@@ -235,6 +237,16 @@ export function SynthesisStep() {
                         >
                             <List className="h-3 w-3" />
                             Details
+                        </button>
+                        <button
+                            onClick={() => setViewMode('visualizations')}
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${viewMode === 'visualizations'
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            <Shapes className="h-3 w-3" />
+                            Visualizations
                         </button>
                     </div>
                     <ConfidenceIndicator level={confidence} />
@@ -313,7 +325,7 @@ export function SynthesisStep() {
                                         {insight.evidence.length > 0 && (
                                             <div className="text-xs text-muted-foreground border-l-2 border-muted pl-3 space-y-1">
                                                 {insight.evidence.slice(0, 2).map((e, i) => (
-                                                    <p key={i} className="italic">"{e}"</p>
+                                                    <p key={i} className="italic">"{e.quote}"</p>
                                                 ))}
                                             </div>
                                         )}
@@ -367,6 +379,11 @@ export function SynthesisStep() {
                         label="To strengthen these insights"
                     />
                 </>
+            )}
+
+            {/* ── Visualizations View ─── */}
+            {viewMode === 'visualizations' && (
+                <ArtifactsGenerator insights={insights} />
             )}
 
             {/* CTA area: Insert to Canvas */}

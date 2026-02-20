@@ -25,6 +25,7 @@
         "@radix-ui/react-tooltip": "^1.1.6",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "firebase": "^12.9.0",
         "lucide-react": "^0.469.0",
         "mammoth": "^1.8.0",
         "openai": "^4.73.0",

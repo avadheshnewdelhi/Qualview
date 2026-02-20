@@ -32,7 +32,7 @@ const QUESTION_TYPE_COLORS = {
 export function ScreenerStep() {
     const {
         context,
-        settings,
+        settings, isSignedIn,
         setLoading,
         setError,
         addResearchObject,
@@ -61,7 +61,7 @@ export function ScreenerStep() {
     const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleGenerate = async () => {
-        if (!settings?.apiKey) {
+        if (!isSignedIn) {
             setSettingsOpen(true);
             return;
         }
@@ -136,17 +136,17 @@ export function ScreenerStep() {
                             </p>
                         </div>
 
-                        {!settings?.apiKey && (
+                        {!isSignedIn && (
                             <div className="p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                                <span>Add your OpenAI API key in settings first</span>
+                                <span>Sign in to use AI features</span>
                             </div>
                         )}
 
                         <Button
                             onClick={handleGenerate}
                             className="w-full"
-                            disabled={!settings?.apiKey || !isOnline || !plan}
+                            disabled={!isSignedIn || !isOnline || !plan}
                         >
                             <Sparkles className="h-4 w-4 mr-2" />
                             Generate Screener

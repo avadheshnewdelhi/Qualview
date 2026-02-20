@@ -33,7 +33,7 @@ export function BiasCheckPanel({
     onFixed,
 }: BiasCheckPanelProps) {
     const {
-        settings,
+        settings, isSignedIn,
         biasCheckResults,
         setBiasCheckResult,
         clearBiasCheckResult,
@@ -53,7 +53,7 @@ export function BiasCheckPanel({
 
     // --- Run bias check ---
     const runBiasCheck = useCallback(async () => {
-        if (!settings?.apiKey) return;
+        if (!isSignedIn) return;
 
         setIsChecking(true);
         setFixedIndices(new Set());
@@ -79,7 +79,7 @@ export function BiasCheckPanel({
     // --- Fix a single issue ---
     const fixSingle = useCallback(
         async (issue: BiasIssue, index: number) => {
-            if (!settings?.apiKey) return;
+            if (!isSignedIn) return;
 
             setFixingIndex(index);
 
@@ -117,7 +117,7 @@ export function BiasCheckPanel({
 
     // --- Fix all issues ---
     const fixAll = useCallback(async () => {
-        if (!settings?.apiKey || !result) return;
+        if (!isSignedIn || !result) return;
 
         setIsFixingAll(true);
 
@@ -316,10 +316,10 @@ export function BiasCheckPanel({
                         <div
                             key={i}
                             className={`rounded-md border p-3 text-sm space-y-1.5 ${isFixed
-                                    ? 'bg-green-50 border-green-200 opacity-60'
-                                    : isError
-                                        ? 'bg-red-50 border-red-200'
-                                        : 'bg-amber-50 border-amber-200'
+                                ? 'bg-green-50 border-green-200 opacity-60'
+                                : isError
+                                    ? 'bg-red-50 border-red-200'
+                                    : 'bg-amber-50 border-amber-200'
                                 }`}
                         >
                             <div className="flex items-center justify-between">
@@ -333,10 +333,10 @@ export function BiasCheckPanel({
                                     )}
                                     <span
                                         className={`font-medium text-xs ${isFixed
-                                                ? 'text-green-700'
-                                                : isError
-                                                    ? 'text-red-700'
-                                                    : 'text-amber-700'
+                                            ? 'text-green-700'
+                                            : isError
+                                                ? 'text-red-700'
+                                                : 'text-amber-700'
                                             }`}
                                     >
                                         {issue.biasType} ({issue.questionId})
@@ -347,8 +347,8 @@ export function BiasCheckPanel({
                                         size="sm"
                                         variant="ghost"
                                         className={`h-6 px-2 text-[11px] ${isError
-                                                ? 'text-red-700 hover:text-red-900 hover:bg-red-100'
-                                                : 'text-amber-700 hover:text-amber-900 hover:bg-amber-100'
+                                            ? 'text-red-700 hover:text-red-900 hover:bg-red-100'
+                                            : 'text-amber-700 hover:text-amber-900 hover:bg-amber-100'
                                             }`}
                                         onClick={() => fixSingle(issue, i)}
                                         disabled={fixingIndex === i || isFixingAll}

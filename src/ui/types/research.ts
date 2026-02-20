@@ -5,7 +5,10 @@ export type ResearchObjectType =
     | 'screener'
     | 'participants'
     | 'interview-guide'
-    | 'insights';
+    | 'insights'
+    | 'persona'
+    | 'empathy-map'
+    | 'journey-map';
 
 export type ConfidenceLevel = 'low' | 'medium' | 'high';
 
@@ -93,11 +96,23 @@ export interface Theme {
     insightIds: string[];
 }
 
+export interface Evidence {
+    quote: string;
+    participantId: string;
+    emotion?: string; // e.g., 'frustrated', 'delighted'
+    sentiment?: 'positive' | 'neutral' | 'negative';
+    journeyStage?: string; // e.g., 'discovery', 'onboarding'
+    tags?: string[];
+}
+
 export interface Insight {
     id: string;
     statement: string;
-    evidence: string[];
+    evidence: Evidence[];
     strength: 'weak' | 'moderate' | 'strong';
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    businessImpact?: 'low' | 'medium' | 'high';
+    confidenceScore?: number; // 0-100
 }
 
 export interface InsightsContent {
@@ -107,13 +122,54 @@ export interface InsightsContent {
     hmwPrompts: string[];
 }
 
+export interface PersonaContent {
+    name: string;
+    role: string;
+    description: string;
+    behaviors: string[];
+    goals: string[];
+    frustrations: string[];
+    needs: string[];
+    representativeQuotes: string[];
+}
+
+export interface EmpathyMapQuadrant {
+    says: string[];
+    thinks: string[];
+    does: string[];
+    feels: string[];
+}
+
+export interface EmpathyMapContent {
+    targetUser: string;
+    quadrants: EmpathyMapQuadrant;
+}
+
+export interface JourneyStage {
+    name: string;
+    description: string;
+    emotion: 'positive' | 'neutral' | 'negative';
+    userActions: string[];
+    painPoints: string[];
+    opportunities: string[];
+}
+
+export interface JourneyMapContent {
+    title: string;
+    targetUser: string;
+    stages: JourneyStage[];
+}
+
 export type ResearchObjectContent =
     | FramingContent
     | PlanContent
     | ScreenerContent
     | ParticipantsContent
     | InterviewGuideContent
-    | InsightsContent;
+    | InsightsContent
+    | PersonaContent
+    | EmpathyMapContent
+    | JourneyMapContent;
 
 // Research Object
 export interface ResearchObject<T extends ResearchObjectContent = ResearchObjectContent> {
@@ -150,6 +206,5 @@ export interface PersistedState {
 
 // Settings
 export interface Settings {
-    apiKey: string;
     model: 'gpt-5.2';
 }

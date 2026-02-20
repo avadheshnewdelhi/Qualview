@@ -285,78 +285,96 @@ const MOCK_INSIGHTS: ResearchObject<InsightsContent> = {
                 id: 'i1',
                 statement: 'Users expected the mobile app to mirror the desktop sidebar navigation, causing disorientation when encountering the tab-based mobile layout.',
                 evidence: [
-                    'P2: "I kept looking for the sidebar. On desktop, everything is on the left. Here I couldn\'t find my projects."',
-                    'P5: "It felt like a completely different product. I had to relearn everything."',
-                    'P8: "I actually thought I was in the wrong workspace because the layout was so different."',
+                    { quote: "I kept looking for the sidebar. On desktop, everything is on the left. Here I couldn't find my projects.", participantId: "P2", emotion: "confused", sentiment: "negative", tags: ["navigation", "layout"] },
+                    { quote: "It felt like a completely different product. I had to relearn everything.", participantId: "P5", emotion: "frustrated", sentiment: "negative", tags: ["learning-curve"] },
+                    { quote: "I actually thought I was in the wrong workspace because the layout was so different.", participantId: "P8", emotion: "lost", sentiment: "negative", tags: ["navigation"] }
                 ],
                 strength: 'strong',
+                severity: 'high',
+                confidenceScore: 92
             },
             {
                 id: 'i2',
                 statement: 'Net-new mobile users (no prior desktop experience) completed onboarding 2.3× faster and reported less confusion than desktop-first users.',
                 evidence: [
-                    'P3: "I just followed the steps. It was pretty straightforward — kind of like setting up Slack."',
-                    'P9: "I didn\'t know what to expect, so I just went with the flow. It was fine."',
+                    { quote: "I just followed the steps. It was pretty straightforward — kind of like setting up Slack.", participantId: "P3", emotion: "relaxed", sentiment: "positive", tags: ["onboarding", "comparison"] },
+                    { quote: "I didn't know what to expect, so I just went with the flow. It was fine.", participantId: "P9", emotion: "neutral", sentiment: "neutral", tags: ["onboarding"] }
                 ],
                 strength: 'moderate',
+                severity: 'low',
+                confidenceScore: 78
             },
             {
                 id: 'i3',
                 statement: 'SSO redirects to external browsers caused 7 of 10 participants to lose their place in onboarding, with 3 having to restart the process entirely.',
                 evidence: [
-                    'P1: "It kicked me out to Safari, then I had to approve something in Okta, and when I came back the app had reset."',
-                    'P4: "I honestly thought it crashed. I closed everything and started over."',
-                    'P7: "The SSO thing took me to a browser and I couldn\'t get back. I had to ask IT for help."',
+                    { quote: "It kicked me out to Safari, then I had to approve something in Okta, and when I came back the app had reset.", participantId: "P1", emotion: "annoyed", sentiment: "negative", tags: ["sso", "authentication"] },
+                    { quote: "I honestly thought it crashed. I closed everything and started over.", participantId: "P4", emotion: "frustrated", sentiment: "negative", tags: ["crash", "sso"] },
+                    { quote: "The SSO thing took me to a browser and I couldn't get back. I had to ask IT for help.", participantId: "P7", emotion: "helpless", sentiment: "negative", tags: ["sso", "support"] }
                 ],
                 strength: 'strong',
+                severity: 'critical',
+                businessImpact: 'high',
+                confidenceScore: 95
             },
             {
                 id: 'i4',
                 statement: 'Participants who joined workspaces via email invite link had a significantly smoother experience than those who used SSO or manual workspace ID entry.',
                 evidence: [
-                    'P6: "My colleague sent me a link. I tapped it, the app opened, and I was in. Easy."',
-                    'P10: "I wish I could just click a link instead of typing in my company\'s workspace ID."',
+                    { quote: "My colleague sent me a link. I tapped it, the app opened, and I was in. Easy.", participantId: "P6", emotion: "delighted", sentiment: "positive", tags: ["invitation", "seamless"] },
+                    { quote: "I wish I could just click a link instead of typing in my company's workspace ID.", participantId: "P10", emotion: "hopeful", sentiment: "neutral", tags: ["feature-request", "login"] }
                 ],
                 strength: 'moderate',
+                severity: 'low',
+                confidenceScore: 82
             },
             {
                 id: 'i5',
                 statement: 'All 10 participants who saw the push notification permission request within the first 60 seconds either denied or dismissed it. The 3 who received it after completing their first task all allowed it.',
                 evidence: [
-                    'P1: "Why does it need to send me notifications? I haven\'t even done anything yet."',
-                    'P6: "I always say no to these. If it asks again later and I see the point, maybe."',
-                    'P10: "After I created my first task, it asked about notifications and I thought, yeah, I should know when someone comments."',
+                    { quote: "Why does it need to send me notifications? I haven't even done anything yet.", participantId: "P1", emotion: "skeptical", sentiment: "negative", tags: ["permissions", "trust"] },
+                    { quote: "I always say no to these. If it asks again later and I see the point, maybe.", participantId: "P6", emotion: "defensive", sentiment: "neutral", tags: ["permissions", "habit"] },
+                    { quote: "After I created my first task, it asked about notifications and I thought, yeah, I should know when someone comments.", participantId: "P10", emotion: "understanding", sentiment: "positive", tags: ["permissions", "timing"] }
                 ],
                 strength: 'strong',
+                severity: 'medium',
+                confidenceScore: 88
             },
             {
                 id: 'i6',
                 statement: 'Participants associated early permission requests with spam and marketing, not with functional utility — even when the request text explained the purpose.',
                 evidence: [
-                    'P3: "Every app does this to send you junk. I just swipe it away."',
-                    'P7: "I read the text but I didn\'t trust it. They all say that."',
+                    { quote: "Every app does this to send you junk. I just swipe it away.", participantId: "P3", emotion: "cynical", sentiment: "negative", tags: ["spam", "permissions"] },
+                    { quote: "I read the text but I didn't trust it. They all say that.", participantId: "P7", emotion: "distrustful", sentiment: "negative", tags: ["trust", "copy"] }
                 ],
                 strength: 'moderate',
+                severity: 'medium',
+                confidenceScore: 75
             },
             {
                 id: 'i7',
                 statement: 'The current 7-step onboarding wizard creates a "setup fatigue" effect. Participants who skipped to exploring the app (possible only via a hidden "skip" link) reported higher satisfaction.',
                 evidence: [
-                    'P2: "By step 4, I was losing patience. I just wanted to see my projects."',
-                    'P5: "I found a tiny \'skip\' link at the bottom. Best decision ever. I figured the rest out on my own."',
-                    'P8: "Seven steps is too many for a phone. On desktop it\'s fine because the screen is big, but on mobile it feels endless."',
+                    { quote: "By step 4, I was losing patience. I just wanted to see my projects.", participantId: "P2", emotion: "impatient", sentiment: "negative", tags: ["fatigue", "onboarding"] },
+                    { quote: "I found a tiny 'skip' link at the bottom. Best decision ever. I figured the rest out on my own.", participantId: "P5", emotion: "relieved", sentiment: "positive", tags: ["skip", "exploration"] },
+                    { quote: "Seven steps is too many for a phone. On desktop it's fine because the screen is big, but on mobile it feels endless.", participantId: "P8", emotion: "exhausted", sentiment: "negative", tags: ["fatigue", "device-context"] }
                 ],
                 strength: 'strong',
+                severity: 'high',
+                businessImpact: 'medium',
+                confidenceScore: 91
             },
             {
                 id: 'i8',
                 statement: 'Participants who could see a "sample project" or demo data during onboarding reported faster understanding of the app\'s value proposition and higher intent to continue using it.',
                 evidence: [
-                    'P4: "If there was a fake project already there, I could just poke around and see what it does."',
-                    'P9: "Notion does this. They give you a \'Getting Started\' page and you just explore. I wish TaskFlow did that."',
+                    { quote: "If there was a fake project already there, I could just poke around and see what it does.", participantId: "P4", emotion: "curious", sentiment: "neutral", tags: ["demo", "exploration"] },
+                    { quote: "Notion does this. They give you a 'Getting Started' page and you just explore. I wish TaskFlow did that.", participantId: "P9", emotion: "wistful", sentiment: "neutral", tags: ["comparison", "demo"] }
                 ],
                 strength: 'moderate',
-            },
+                severity: 'low',
+                confidenceScore: 85
+            }
         ],
         opportunities: [
             'Implement progressive disclosure onboarding: reduce initial steps from 7 to 3, let users explore first and complete setup gradually',

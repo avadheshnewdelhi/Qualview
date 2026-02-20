@@ -45,16 +45,25 @@ export function getLayoutConfig(): LayoutConfig {
  * Find all Qualview artifact nodes on the current page
  * Matches frames by known type names (with or without legacy "Qualview:" prefix)
  */
-const KNOWN_TYPE_NAMES = ['Framing', 'Plan', 'Screener', 'Participants', 'Interview-guide', 'Insights'];
+const KNOWN_TYPE_NAMES = [
+    'Framing', 'Plan', 'Screener', 'Participants', 'Interview-guide', 'Insights',
+    'Behavioral Persona', 'Empathy Map', 'User Journey Map',
+    'Theme Stories', 'Participant × Theme Heatmap', 'Evidence Strength',
+    'Participant Voices', 'Themes → Opportunities'
+];
 
-export function findQualviewNodes(): SceneNode[] {
+export async function findQualviewNodes(): Promise<SceneNode[]> {
     const nodes: SceneNode[] = [];
 
     // First, check tracked nodes from this session
     for (const nodeId of insertedNodeIds) {
-        const node = figma.getNodeById(nodeId);
-        if (node && node.type === 'FRAME' && 'x' in node) {
-            nodes.push(node as SceneNode);
+        try {
+            const node = await figma.getNodeByIdAsync(nodeId);
+            if (node && node.type === 'FRAME' && 'x' in node) {
+                nodes.push(node as SceneNode);
+            }
+        } catch (e) {
+            console.warn(`Could not find tracked node ${nodeId}`, e);
         }
     }
 

@@ -1,48 +1,96 @@
-import OpenAI from 'openai';
 import type { Settings, ResearchContext } from '@/types';
+import { auth } from '@/lib/firebase';
 
-let openaiClient: OpenAI | null = null;
+// Cloud Function URL — set after first deploy
+// For local dev, use emulator URL: http://127.0.0.1:5001/qualview-plugin/us-central1/generate
+const FUNCTION_URL = 'https://us-central1-qualview-plugin.cloudfunctions.net/generate';
 
 /**
- * Initialize or get the OpenAI client
+ * Get Firebase auth token for Cloud Function calls
  */
-export function getOpenAIClient(settings: Settings): OpenAI {
-    if (!openaiClient || openaiClient.apiKey !== settings.apiKey) {
-        openaiClient = new OpenAI({
-            apiKey: settings.apiKey,
-            dangerouslyAllowBrowser: true, // Required for client-side usage
-        });
+async function getAuthToken(): Promise<string> {
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('Please sign in to use AI features');
     }
-    return openaiClient;
+    return user.getIdToken();
 }
 
 /**
- * Make a completion request with JSON response
+ * Make a completion request via Cloud Function
  */
 export async function generateCompletion<T>(
     settings: Settings,
     systemPrompt: string,
     userPrompt: string
 ): Promise<T> {
-    const client = getOpenAIClient(settings);
+    const token = await getAuthToken();
 
-    const response = await client.chat.completions.create({
-        model: settings.model,
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 16384, // Increased for larger responses (many participants)
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-        ],
+    const response = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+            ],
+            model: settings.model,
+            responseFormat: { type: 'json_object' },
+        }),
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-        throw new Error('No response from OpenAI');
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(error.message || `AI request failed (${response.status})`);
     }
 
-    return JSON.parse(content) as T;
+    const data = await response.json();
+    if (!data.content) {
+        throw new Error('No response from AI');
+    }
+
+    return JSON.parse(data.content) as T;
+}
+
+/**
+ * Make a vision completion request via Cloud Function (for OCR/image analysis)
+ */
+export async function generateVisionCompletion(
+    imageDataUrl: string,
+    prompt: string
+): Promise<string> {
+    const token = await getAuthToken();
+
+    const response = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: prompt },
+                        { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                    ],
+                },
+            ],
+            model: 'gpt-4o',
+        }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(error.message || `Vision request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.content || '';
 }
 
 /**

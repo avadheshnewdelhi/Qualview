@@ -59,25 +59,16 @@ export interface ParsedResponseResult {
 export async function parseResponseWithAI(
     content: string,
     fileName: string,
-    settings: { apiKey: string; model: string }
+    settings: { model: string }
 ): Promise<UploadedResponse | null> {
-    // Dynamic import to avoid circular dependencies
-    const OpenAI = (await import('openai')).default;
-    const client = new OpenAI({ apiKey: settings.apiKey, dangerouslyAllowBrowser: true });
+    const { generateCompletion } = await import('@/lib/openai');
 
     try {
-        const response = await client.chat.completions.create({
-            model: settings.model,
-            response_format: { type: 'json_object' },
-            temperature: 0.3,
-            max_tokens: 4096,
-            messages: [
-                { role: 'system', content: parseResponsePrompt.system },
-                { role: 'user', content: parseResponsePrompt.buildUserPrompt(content, fileName) },
-            ],
-        });
-
-        const result = JSON.parse(response.choices[0]?.message?.content || '{}') as ParsedResponseResult;
+        const result = await generateCompletion<ParsedResponseResult>(
+            settings as any,
+            parseResponsePrompt.system,
+            parseResponsePrompt.buildUserPrompt(content, fileName)
+        );
 
         if (!result.participantId || !result.answers) {
             console.error('Invalid parse result:', result);

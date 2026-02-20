@@ -1,6 +1,6 @@
 /// <reference types="@figma/plugin-typings" />
 
-import { getNextPosition, findQualviewNodes } from './layout';
+import { getNextPosition, findQualviewNodes, registerInsertedNode } from './layout';
 
 /**
  * Visualization Canvas Renderer
@@ -39,6 +39,8 @@ function text(
     if (opts.fill !== false) {
         t.layoutAlign = 'STRETCH';
         t.textAutoResize = 'HEIGHT';
+    } else {
+        t.textAutoResize = 'WIDTH_AND_HEIGHT';
     }
     return t;
 }
@@ -48,7 +50,7 @@ function card(name: string, bg?: string): FrameNode {
     f.name = name;
     f.layoutMode = 'VERTICAL';
     f.primaryAxisSizingMode = 'AUTO';
-    f.counterAxisSizingMode = 'AUTO';
+    f.counterAxisSizingMode = 'FIXED';
     f.layoutAlign = 'STRETCH';
     f.paddingTop = 10;
     f.paddingBottom = 10;
@@ -92,7 +94,7 @@ function hRow(name: string, spacing = 6): FrameNode {
     const f = figma.createFrame();
     f.name = name;
     f.layoutMode = 'HORIZONTAL';
-    f.primaryAxisSizingMode = 'AUTO';
+    f.primaryAxisSizingMode = 'FIXED';
     f.counterAxisSizingMode = 'AUTO';
     f.layoutAlign = 'STRETCH';
     f.counterAxisAlignItems = 'CENTER';
@@ -116,10 +118,19 @@ interface Theme {
     insightIds: string[];
 }
 
+interface Evidence {
+    quote: string;
+    participantId: string;
+    emotion?: string;
+    sentiment?: 'positive' | 'neutral' | 'negative';
+    journeyStage?: string;
+    tags?: string[];
+}
+
 interface Insight {
     id: string;
     statement: string;
-    evidence: string[];
+    evidence: Evidence[];
     strength: 'weak' | 'moderate' | 'strong';
 }
 
@@ -128,6 +139,42 @@ interface InsightsData {
     insights: Insight[];
     opportunities: string[];
     hmwPrompts: string[];
+}
+
+interface PersonaContent {
+    name: string;
+    role: string;
+    description: string;
+    behaviors: string[];
+    goals: string[];
+    frustrations: string[];
+    needs: string[];
+    representativeQuotes: string[];
+}
+
+interface EmpathyMapContent {
+    targetUser: string;
+    quadrants: {
+        says: string[];
+        thinks: string[];
+        does: string[];
+        feels: string[];
+    };
+}
+
+interface JourneyStage {
+    name: string;
+    description: string;
+    emotion: 'positive' | 'neutral' | 'negative';
+    userActions: string[];
+    painPoints: string[];
+    opportunities: string[];
+}
+
+interface JourneyMapContent {
+    title: string;
+    targetUser: string;
+    stages: JourneyStage[];
 }
 
 // ─── Renderers ─────────────────────────────────────────────────────────────
@@ -174,8 +221,10 @@ async function renderHeatmap(data: InsightsData): Promise<FrameNode> {
     const pIds = new Set<string>();
     for (const ins of data.insights) {
         for (const ev of ins.evidence) {
-            const m = ev.match(/P(\d+)/);
-            if (m) pIds.add(m[1]);
+            if (ev.participantId) {
+                const m = ev.participantId.match(/^P?(\d+)/i);
+                if (m) pIds.add(m[1]);
+            }
         }
     }
     const sortedPIds = Array.from(pIds).sort((a, b) => Number(a) - Number(b));
@@ -199,8 +248,10 @@ async function renderHeatmap(data: InsightsData): Promise<FrameNode> {
         const pCounts: Record<string, number> = {};
         for (const ins of themeInsights) {
             for (const ev of ins.evidence) {
-                const m = ev.match(/P(\d+)/);
-                if (m) pCounts[m[1]] = (pCounts[m[1]] || 0) + 1;
+                if (ev.participantId) {
+                    const m = ev.participantId.match(/^P?(\d+)/i);
+                    if (m) pCounts[m[1]] = (pCounts[m[1]] || 0) + 1;
+                }
             }
         }
 
@@ -285,7 +336,7 @@ async function renderStrengthLadder(data: InsightsData): Promise<FrameNode> {
 
             // First quote
             if (ins.evidence[0]) {
-                c.appendChild(text(`"${ins.evidence[0]}"`, { size: 10, italic: true, color: hexToRgb('#6B7280') }));
+                c.appendChild(text(`"${ins.evidence[0].quote}"`, { size: 10, italic: true, color: hexToRgb('#6B7280') }));
             }
 
             frame.appendChild(c);
@@ -312,17 +363,16 @@ async function renderParticipantVoices(data: InsightsData): Promise<FrameNode> {
         let bestParticipant = '';
         for (const ins of themeInsights) {
             for (const ev of ins.evidence) {
-                if (ev.length > bestQuote.length) {
-                    bestQuote = ev;
-                    const m = ev.match(/^P(\d+)/);
-                    bestParticipant = m ? `P${m[1]}` : '';
+                if (ev.quote.length > bestQuote.length) {
+                    bestQuote = ev.quote;
+                    bestParticipant = ev.participantId || '';
                 }
             }
         }
 
         if (!bestQuote) continue;
 
-        const cleanedQuote = bestQuote.replace(/^P\d+:\s*/, '').replace(/^[""]|[""]$/g, '');
+        const cleanedQuote = bestQuote.replace(/^[""]|[""]$/g, '');
 
         const c = card(`Quote: ${theme.name}`);
         // Left accent bar via stroke
@@ -391,6 +441,246 @@ async function renderOpportunityFlow(data: InsightsData): Promise<FrameNode> {
     return frame;
 }
 
+// ─── New Artifact Renderers ────────────────────────────────────────────────
+
+async function renderPersona(persona: PersonaContent): Promise<FrameNode> {
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    await figma.loadFontAsync({ family: 'Inter', style: 'Bold' });
+    await figma.loadFontAsync({ family: 'Inter', style: 'Italic' });
+
+    const frame = container('Behavioral Persona', '#3B82F6');
+    frame.appendChild(text('BEHAVIORAL PERSONA', { size: 10, bold: true, color: hexToRgb('#6B7280'), fill: false }));
+
+    const header = figma.createFrame();
+    header.name = 'header';
+    header.layoutMode = 'VERTICAL';
+    header.primaryAxisSizingMode = 'AUTO';
+    header.counterAxisSizingMode = 'FIXED';
+    header.layoutAlign = 'STRETCH';
+    header.fills = [];
+    header.appendChild(text(persona.name, { size: 24, bold: true, color: hexToRgb('#111827') }));
+    header.appendChild(text(persona.role, { size: 14, color: hexToRgb('#6B7280') }));
+
+    frame.appendChild(header);
+
+    const desc = card('Overview', '#EFF6FF');
+    desc.appendChild(text(persona.description, { size: 13, italic: true, color: hexToRgb('#1E40AF') }));
+    frame.appendChild(desc);
+
+    const attrGrid = figma.createFrame();
+    attrGrid.layoutMode = 'HORIZONTAL';
+    attrGrid.primaryAxisSizingMode = 'FIXED';
+    attrGrid.counterAxisSizingMode = 'AUTO';
+    attrGrid.layoutAlign = 'STRETCH';
+    attrGrid.itemSpacing = 16;
+    attrGrid.fills = [];
+
+    const col1 = figma.createFrame();
+    col1.layoutMode = 'VERTICAL';
+    col1.primaryAxisSizingMode = 'AUTO';
+    col1.counterAxisSizingMode = 'FIXED';
+    col1.layoutGrow = 1;
+    col1.itemSpacing = 12;
+    col1.fills = [];
+
+    const col2 = figma.createFrame();
+    col2.layoutMode = 'VERTICAL';
+    col2.primaryAxisSizingMode = 'AUTO';
+    col2.counterAxisSizingMode = 'FIXED';
+    col2.layoutGrow = 1;
+    col2.itemSpacing = 12;
+    col2.fills = [];
+
+    const behaviors = card('Behaviors');
+    behaviors.appendChild(text('BEHAVIORS', { size: 10, bold: true, color: hexToRgb('#6B7280'), fill: false }));
+    persona.behaviors.forEach((b) => behaviors.appendChild(text(`• ${b}`, { size: 12 })));
+    col1.appendChild(behaviors);
+
+    const needs = card('Needs');
+    needs.appendChild(text('NEEDS', { size: 10, bold: true, color: hexToRgb('#6B7280'), fill: false }));
+    persona.needs.forEach((n) => needs.appendChild(text(`• ${n}`, { size: 12 })));
+    col1.appendChild(needs);
+
+    const goals = card('Goals', '#F0FDF4');
+    goals.appendChild(text('GOALS', { size: 10, bold: true, color: hexToRgb('#16A34A'), fill: false }));
+    persona.goals.forEach((g) => goals.appendChild(text(`• ${g}`, { size: 12 })));
+    col2.appendChild(goals);
+
+    const frustrations = card('Frustrations', '#FEF2F2');
+    frustrations.appendChild(text('FRUSTRATIONS', { size: 10, bold: true, color: hexToRgb('#DC2626'), fill: false }));
+    persona.frustrations.forEach((f) => frustrations.appendChild(text(`• ${f}`, { size: 12 })));
+    col2.appendChild(frustrations);
+
+    attrGrid.appendChild(col1);
+    attrGrid.appendChild(col2);
+    frame.appendChild(attrGrid);
+
+    return frame;
+}
+
+async function renderEmpathyMap(map: EmpathyMapContent): Promise<FrameNode> {
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    await figma.loadFontAsync({ family: 'Inter', style: 'Bold' });
+    await figma.loadFontAsync({ family: 'Inter', style: 'Italic' });
+
+    const frame = container('Empathy Map', '#EC4899');
+    frame.appendChild(text('EMPATHY MAP', { size: 10, bold: true, color: hexToRgb('#6B7280'), fill: false }));
+    frame.appendChild(text(`Target User: ${map.targetUser}`, { size: 14, bold: true }));
+
+    const grid = figma.createFrame();
+    grid.name = 'Grid';
+    grid.layoutMode = 'VERTICAL';
+    grid.primaryAxisSizingMode = 'AUTO';
+    grid.counterAxisSizingMode = 'FIXED';
+    grid.layoutAlign = 'STRETCH';
+    grid.itemSpacing = 8;
+    grid.fills = [];
+
+    const topRow = figma.createFrame();
+    topRow.layoutMode = 'HORIZONTAL';
+    topRow.primaryAxisSizingMode = 'FIXED';
+    topRow.counterAxisSizingMode = 'AUTO';
+    topRow.layoutAlign = 'STRETCH';
+    topRow.itemSpacing = 8;
+    topRow.fills = [];
+
+    const saysCard = card('Says', '#EFF6FF');
+    saysCard.layoutGrow = 1;
+    saysCard.appendChild(text('SAYS', { size: 12, bold: true, color: hexToRgb('#2563EB'), fill: false }));
+    map.quadrants.says.forEach((s) => saysCard.appendChild(text(`"${s}"`, { size: 12, italic: true })));
+    topRow.appendChild(saysCard);
+
+    const thinksCard = card('Thinks', '#F5F3FF');
+    thinksCard.layoutGrow = 1;
+    thinksCard.appendChild(text('THINKS', { size: 12, bold: true, color: hexToRgb('#7C3AED'), fill: false }));
+    map.quadrants.thinks.forEach((t) => thinksCard.appendChild(text(`• ${t}`, { size: 12 })));
+    topRow.appendChild(thinksCard);
+
+    grid.appendChild(topRow);
+
+    const bottomRow = figma.createFrame();
+    bottomRow.layoutMode = 'HORIZONTAL';
+    bottomRow.primaryAxisSizingMode = 'FIXED';
+    bottomRow.counterAxisSizingMode = 'AUTO';
+    bottomRow.layoutAlign = 'STRETCH';
+    bottomRow.itemSpacing = 8;
+    bottomRow.fills = [];
+
+    const doesCard = card('Does', '#F0FDF4');
+    doesCard.layoutGrow = 1;
+    doesCard.appendChild(text('DOES', { size: 12, bold: true, color: hexToRgb('#16A34A'), fill: false }));
+    map.quadrants.does.forEach((d) => doesCard.appendChild(text(`• ${d}`, { size: 12 })));
+    bottomRow.appendChild(doesCard);
+
+    const feelsCard = card('Feels', '#FEF2F2');
+    feelsCard.layoutGrow = 1;
+    feelsCard.appendChild(text('FEELS', { size: 12, bold: true, color: hexToRgb('#E11D48'), fill: false }));
+    map.quadrants.feels.forEach((f) => feelsCard.appendChild(text(`• ${f}`, { size: 12 })));
+    bottomRow.appendChild(feelsCard);
+
+    grid.appendChild(bottomRow);
+    frame.appendChild(grid);
+
+    return frame;
+}
+
+async function renderJourneyMap(journey: JourneyMapContent): Promise<FrameNode> {
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    await figma.loadFontAsync({ family: 'Inter', style: 'Bold' });
+
+    // Make journey map wider (increased by 250%)
+    const frame = container('User Journey Map', '#8B5CF6');
+    frame.resize(2000, 100);
+
+    frame.appendChild(text('USER JOURNEY MAP', { size: 10, bold: true, color: hexToRgb('#6B7280'), fill: false }));
+
+    const header = figma.createFrame();
+    header.layoutMode = 'VERTICAL';
+    header.primaryAxisSizingMode = 'AUTO';
+    header.counterAxisSizingMode = 'FIXED';
+    header.layoutAlign = 'STRETCH';
+    header.fills = [];
+    header.appendChild(text(journey.title, { size: 24, bold: true, color: hexToRgb('#111827') }));
+    header.appendChild(text(`Target User: ${journey.targetUser}`, { size: 14, color: hexToRgb('#6B7280') }));
+    frame.appendChild(header);
+
+    const timeline = figma.createFrame();
+    timeline.layoutMode = 'HORIZONTAL';
+    timeline.primaryAxisSizingMode = 'FIXED';
+    timeline.counterAxisSizingMode = 'AUTO';
+    timeline.layoutAlign = 'STRETCH';
+    timeline.itemSpacing = 16;
+    timeline.fills = [];
+
+    const getEmotionColor = (emotion: string) => {
+        if (emotion === 'positive') return '#10B981';
+        if (emotion === 'negative') return '#EF4444';
+        return '#9CA3AF';
+    };
+
+    journey.stages.forEach((stage, i) => {
+        const stageCard = card(`Stage ${i + 1}`);
+        stageCard.layoutGrow = 1;
+
+        const headerRow = hRow('stage-header', 8);
+        headerRow.layoutAlign = 'STRETCH';
+        const stText = text(`${i + 1}. ${stage.name}`, { size: 14, bold: true });
+        stText.layoutGrow = 1;
+        headerRow.appendChild(stText);
+
+        // Emotion dot
+        const dotBg = figma.createFrame();
+        dotBg.resize(16, 16);
+        dotBg.cornerRadius = 8;
+        dotBg.fills = [{ type: 'SOLID', color: hexToRgb(getEmotionColor(stage.emotion)) }];
+        headerRow.appendChild(dotBg);
+
+        stageCard.appendChild(headerRow);
+        stageCard.appendChild(text(stage.description, { size: 12, color: hexToRgb('#6B7280') }));
+
+        if (stage.painPoints.length > 0) {
+            const painCard = figma.createFrame();
+            painCard.layoutMode = 'VERTICAL';
+            painCard.primaryAxisSizingMode = 'AUTO';
+            painCard.counterAxisSizingMode = 'FIXED';
+            painCard.layoutAlign = 'STRETCH';
+            painCard.paddingTop = 8;
+            painCard.paddingBottom = 8;
+            painCard.paddingLeft = 8;
+            painCard.paddingRight = 8;
+            painCard.cornerRadius = 4;
+            painCard.itemSpacing = 4;
+            painCard.fills = [{ type: 'SOLID', color: hexToRgb('#FEF2F2') }];
+            painCard.appendChild(text('PAIN POINTS', { size: 9, bold: true, color: hexToRgb('#DC2626'), fill: false }));
+            stage.painPoints.forEach(p => painCard.appendChild(text(`• ${p}`, { size: 11, color: hexToRgb('#991B1B') })));
+            stageCard.appendChild(painCard);
+        }
+
+        if (stage.opportunities.length > 0) {
+            const oppCard = figma.createFrame();
+            oppCard.layoutMode = 'VERTICAL';
+            oppCard.primaryAxisSizingMode = 'AUTO';
+            oppCard.counterAxisSizingMode = 'FIXED';
+            oppCard.layoutAlign = 'STRETCH';
+            oppCard.paddingTop = 8;
+            oppCard.paddingBottom = 8;
+            oppCard.paddingLeft = 8;
+            oppCard.paddingRight = 8;
+            oppCard.cornerRadius = 4;
+            oppCard.itemSpacing = 4;
+            oppCard.fills = [{ type: 'SOLID', color: hexToRgb('#EFF6FF') }];
+            oppCard.appendChild(text('OPPORTUNITIES', { size: 9, bold: true, color: hexToRgb('#2563EB'), fill: false }));
+            stage.opportunities.forEach(o => oppCard.appendChild(text(`• ${o}`, { size: 11, color: hexToRgb('#1E40AF') })));
+            stageCard.appendChild(oppCard);
+        }
+
+        timeline.appendChild(stageCard);
+    });
+
+    frame.appendChild(timeline);
+    return frame;
+}
+
 // ─── Main dispatcher ───────────────────────────────────────────────────────
 
 export interface VizInsertResult {
@@ -426,18 +716,29 @@ export async function renderVisualization(
         case 'opportunity-flow':
             frame = await renderOpportunityFlow(insightsData);
             break;
+        case 'persona':
+            frame = await renderPersona((dataObj.content || dataObj) as unknown as PersonaContent);
+            break;
+        case 'empathy-map':
+            frame = await renderEmpathyMap((dataObj.content || dataObj) as unknown as EmpathyMapContent);
+            break;
+        case 'journey-map':
+            frame = await renderJourneyMap((dataObj.content || dataObj) as unknown as JourneyMapContent);
+            break;
         default:
             throw new Error(`Unknown visualization type: ${vizType}`);
     }
 
     // Position on canvas
-    const existingNodes = findQualviewNodes();
+    const existingNodes = await findQualviewNodes();
     const pos = getNextPosition(existingNodes, VIZ_WIDTH, 400);
     frame.x = pos.x;
     frame.y = pos.y;
 
     figma.currentPage.appendChild(frame);
     figma.viewport.scrollAndZoomIntoView([frame]);
+
+    registerInsertedNode(frame.id);
 
     return { vizType, nodeId: frame.id };
 }

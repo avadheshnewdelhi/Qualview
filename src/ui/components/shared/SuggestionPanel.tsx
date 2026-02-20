@@ -27,7 +27,7 @@ export function SuggestionPanel({
     label,
     mode = 'checklist',
 }: SuggestionPanelProps) {
-    const { settings } = useStore();
+    const { settings, isSignedIn } = useStore();
     const [checkedIndices, setCheckedIndices] = useState<Set<number>>(new Set());
     const [applyingIndex, setApplyingIndex] = useState<number | null>(null);
     const [isApplyingAll, setIsApplyingAll] = useState(false);
@@ -35,7 +35,7 @@ export function SuggestionPanel({
     // --- Apply mode logic ---
     const applySuggestion = useCallback(
         async (instruction: string, index?: number) => {
-            if (mode !== 'apply' || !settings?.apiKey || !currentContent || !onApplied) return;
+            if (mode !== 'apply' || !isSignedIn || !currentContent || !onApplied) return;
 
             if (index !== undefined) {
                 setApplyingIndex(index);
