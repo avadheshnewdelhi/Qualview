@@ -3,6 +3,7 @@
 import { getSelectionData } from '../canvas/selection';
 import { loadState, saveState, loadSettings, saveSettings, clearState } from '../persistence/storage';
 import { insertResearchObject } from '../canvas/renderer';
+import { renderVisualization } from '../canvas/vizRenderer';
 
 interface UIMessage {
     type: string;
@@ -89,6 +90,26 @@ export async function handleMessage(msg: UIMessage): Promise<void> {
                     payload: {
                         code: 'INSERT_FAILED',
                         message: error instanceof Error ? error.message : 'Failed to insert object',
+                    },
+                });
+            }
+            break;
+        }
+
+        case 'INSERT_VISUALIZATION': {
+            try {
+                const { vizType, data } = msg.payload as { vizType: string; data: unknown };
+                const result = await renderVisualization(vizType, data);
+                figma.ui.postMessage({
+                    type: 'VIZ_INSERTED',
+                    payload: result,
+                });
+            } catch (error) {
+                figma.ui.postMessage({
+                    type: 'ERROR',
+                    payload: {
+                        code: 'VIZ_INSERT_FAILED',
+                        message: error instanceof Error ? error.message : 'Failed to insert visualization',
                     },
                 });
             }

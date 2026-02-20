@@ -7,6 +7,7 @@ export type UIMessage =
     | { type: 'GET_PERSISTED_STATE' }
     | { type: 'SAVE_STATE'; payload: PersistedState }
     | { type: 'INSERT_RESEARCH_OBJECT'; payload: ResearchObject }
+    | { type: 'INSERT_VISUALIZATION'; payload: { vizType: string; data: unknown } }
     | { type: 'GET_FILE_TYPE' }
     | { type: 'GET_SETTINGS' }
     | { type: 'SAVE_SETTINGS'; payload: Settings }
@@ -20,6 +21,7 @@ export type MainMessage =
     | { type: 'STATE_SAVED' }
     | { type: 'STATE_CLEARED' }
     | { type: 'OBJECT_INSERTED'; payload: { objectId: string; nodeId: string } }
+    | { type: 'VIZ_INSERTED'; payload: { vizType: string; nodeId: string } }
     | { type: 'FILE_TYPE'; payload: 'figma' | 'figjam' }
     | { type: 'SETTINGS_LOADED'; payload: Settings | null }
     | { type: 'SETTINGS_SAVED' }
