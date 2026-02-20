@@ -14,6 +14,7 @@ import type {
 } from '@/types';
 import type { BiasCheckResult } from '@/lib/prompts/bias';
 import { postMessage } from '@/lib/figma';
+import { MOCK_PROJECT } from '@/lib/mockProject';
 
 // Workflow steps
 export const STEPS = [
@@ -124,6 +125,7 @@ interface StoreState {
 
     // Project Management
     resetProject: () => void;
+    loadDemoProject: () => void;
 }
 
 const initialContext: ResearchContext = {
@@ -375,6 +377,22 @@ export const useStore = create<StoreState>((set, get) => ({
             ui: {
                 ...get().ui,
                 currentStep: 0,
+                error: null,
+            },
+        });
+    },
+
+    loadDemoProject: () => {
+        set({
+            context: MOCK_PROJECT.context,
+            researchObjects: MOCK_PROJECT.researchObjects,
+            transcripts: MOCK_PROJECT.transcripts,
+            stepContexts: {},
+            biasCheckResults: {},
+            previousVersions: {},
+            ui: {
+                ...get().ui,
+                currentStep: 6, // Jump to Synthesis
                 error: null,
             },
         });

@@ -8,6 +8,7 @@ import { EditableCard } from '@/components/shared/EditableCard';
 import { EditPanel } from '@/components/shared/EditPanel';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
+import { InsightsDashboard } from '@/components/shared/InsightsDashboard';
 import { FileUpload } from '@/components/context/FileUpload';
 import {
     Sparkles,
@@ -17,7 +18,9 @@ import {
     AlertCircle,
     X,
     Zap,
-    HelpCircle
+    HelpCircle,
+    BarChart3,
+    List
 } from 'lucide-react';
 import { generateCompletion, buildContextSummary } from '@/lib/openai';
 import { synthesisPrompt } from '@/lib/prompts';
@@ -61,6 +64,7 @@ export function SynthesisStep() {
         existingInsights?.improvementSuggestions || []
     );
     const [isEditing, setIsEditing] = useState(false);
+    const [viewMode, setViewMode] = useState<'dashboard' | 'details'>('dashboard');
     const [reasoning, setReasoning] = useState<ReasoningFactor[]>([]);
 
     const handleFileProcessed = useCallback((content: string, fileName: string) => {
@@ -210,124 +214,160 @@ export function SynthesisStep() {
                         {insights.themes.length} themes, {insights.insights.length} insights
                     </p>
                 </div>
-                <ConfidenceIndicator level={confidence} />
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-muted rounded-md p-0.5">
+                        <button
+                            onClick={() => setViewMode('dashboard')}
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${viewMode === 'dashboard'
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            <BarChart3 className="h-3 w-3" />
+                            Dashboard
+                        </button>
+                        <button
+                            onClick={() => setViewMode('details')}
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${viewMode === 'details'
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            <List className="h-3 w-3" />
+                            Details
+                        </button>
+                    </div>
+                    <ConfidenceIndicator level={confidence} />
+                </div>
             </div>
 
             <LogicPanel reasoning={reasoning} />
 
-            <EditableCard
-                isEditing={isEditing}
-                onEditToggle={setIsEditing}
-                headerContent={
-                    <span className="text-xs text-muted-foreground">
-                        {insights.themes.length} themes · {insights.insights.length} insights
-                    </span>
-                }
-                editPanel={
-                    <EditPanel
-                        stepKey="synthesis"
+            {/* ── Dashboard View ─── */}
+            {viewMode === 'dashboard' && (
+                <InsightsDashboard
+                    insights={insights}
+                    transcriptCount={transcripts.length}
+                />
+            )}
+
+            {viewMode === 'details' && (
+                <>
+                    <EditableCard
+                        isEditing={isEditing}
+                        onEditToggle={setIsEditing}
+                        headerContent={
+                            <span className="text-xs text-muted-foreground">
+                                {insights.themes.length} themes · {insights.insights.length} insights
+                            </span>
+                        }
+                        editPanel={
+                            <EditPanel
+                                stepKey="synthesis"
+                                artifactType="insights"
+                                currentContent={insights}
+                                onUpdated={(newContent, newConf, newSuggestions) => {
+                                    setInsights(newContent as InsightsContent);
+                                    setConfidence(newConf as ConfidenceLevel);
+                                    setSuggestions(newSuggestions);
+                                    addResearchObject('insights', newContent, newConf as ConfidenceLevel, newSuggestions);
+                                }}
+                                placeholder='e.g., "Merge theme 1 and 3" or "Add more evidence for the accessibility insight"'
+                                contextPlaceholder='e.g., "P3 mentioned accessibility issues off-record" or "Focus on onboarding friction"'
+                            />
+                        }
+                    >
+                        {/* Themes */}
+                        <div className="space-y-2">
+                            <h3 className="text-sm font-medium flex items-center gap-2">
+                                <Zap className="h-4 w-4 text-primary" />
+                                Themes
+                            </h3>
+                            <div className="grid gap-2">
+                                {insights.themes.map((theme) => (
+                                    <Card key={theme.id} className="bg-primary/5">
+                                        <CardContent className="py-3">
+                                            <h4 className="font-medium text-sm">{theme.name}</h4>
+                                            <p className="text-xs text-muted-foreground mt-1">{theme.description}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Insights */}
+                        <div className="space-y-2">
+                            <h3 className="text-sm font-medium flex items-center gap-2">
+                                <Lightbulb className="h-4 w-4 text-amber-500" />
+                                Key Insights
+                            </h3>
+                            {insights.insights.map((insight) => (
+                                <Card key={insight.id}>
+                                    <CardContent className="py-3 space-y-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <p className="text-sm font-medium flex-1">{insight.statement}</p>
+                                            <Badge className={STRENGTH_COLORS[insight.strength]}>
+                                                {insight.strength}
+                                            </Badge>
+                                        </div>
+                                        {insight.evidence.length > 0 && (
+                                            <div className="text-xs text-muted-foreground border-l-2 border-muted pl-3 space-y-1">
+                                                {insight.evidence.slice(0, 2).map((e, i) => (
+                                                    <p key={i} className="italic">"{e}"</p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {/* Opportunities */}
+                        {insights.opportunities.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-medium">Opportunities</h3>
+                                <Card>
+                                    <CardContent className="py-3">
+                                        <ul className="space-y-1">
+                                            {insights.opportunities.map((opp, i) => (
+                                                <li key={i} className="text-sm flex items-start gap-2">
+                                                    <span className="text-green-500">→</span>
+                                                    {opp}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+
+                        {/* HMW Prompts */}
+                        {insights.hmwPrompts.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-medium flex items-center gap-2">
+                                    <HelpCircle className="h-4 w-4 text-purple-500" />
+                                    How Might We...
+                                </h3>
+                                <Card className="bg-purple-50 border-purple-200">
+                                    <CardContent className="py-3">
+                                        <ul className="space-y-1">
+                                            {insights.hmwPrompts.map((hmw, i) => (
+                                                <li key={i} className="text-sm text-purple-800">• {hmw}</li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+                    </EditableCard>
+
+                    <SuggestionPanel
+                        suggestions={suggestions}
                         artifactType="insights"
-                        currentContent={insights}
-                        onUpdated={(newContent, newConf, newSuggestions) => {
-                            setInsights(newContent as InsightsContent);
-                            setConfidence(newConf as ConfidenceLevel);
-                            setSuggestions(newSuggestions);
-                            addResearchObject('insights', newContent, newConf as ConfidenceLevel, newSuggestions);
-                        }}
-                        placeholder='e.g., "Merge theme 1 and 3" or "Add more evidence for the accessibility insight"'
-                        contextPlaceholder='e.g., "P3 mentioned accessibility issues off-record" or "Focus on onboarding friction"'
+                        label="To strengthen these insights"
                     />
-                }
-            >
-                {/* Themes */}
-                <div className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-primary" />
-                        Themes
-                    </h3>
-                    <div className="grid gap-2">
-                        {insights.themes.map((theme) => (
-                            <Card key={theme.id} className="bg-primary/5">
-                                <CardContent className="py-3">
-                                    <h4 className="font-medium text-sm">{theme.name}</h4>
-                                    <p className="text-xs text-muted-foreground mt-1">{theme.description}</p>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Insights */}
-                <div className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                        <Lightbulb className="h-4 w-4 text-amber-500" />
-                        Key Insights
-                    </h3>
-                    {insights.insights.map((insight) => (
-                        <Card key={insight.id}>
-                            <CardContent className="py-3 space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="text-sm font-medium flex-1">{insight.statement}</p>
-                                    <Badge className={STRENGTH_COLORS[insight.strength]}>
-                                        {insight.strength}
-                                    </Badge>
-                                </div>
-                                {insight.evidence.length > 0 && (
-                                    <div className="text-xs text-muted-foreground border-l-2 border-muted pl-3 space-y-1">
-                                        {insight.evidence.slice(0, 2).map((e, i) => (
-                                            <p key={i} className="italic">"{e}"</p>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                {/* Opportunities */}
-                {insights.opportunities.length > 0 && (
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-medium">Opportunities</h3>
-                        <Card>
-                            <CardContent className="py-3">
-                                <ul className="space-y-1">
-                                    {insights.opportunities.map((opp, i) => (
-                                        <li key={i} className="text-sm flex items-start gap-2">
-                                            <span className="text-green-500">→</span>
-                                            {opp}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* HMW Prompts */}
-                {insights.hmwPrompts.length > 0 && (
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-medium flex items-center gap-2">
-                            <HelpCircle className="h-4 w-4 text-purple-500" />
-                            How Might We...
-                        </h3>
-                        <Card className="bg-purple-50 border-purple-200">
-                            <CardContent className="py-3">
-                                <ul className="space-y-1">
-                                    {insights.hmwPrompts.map((hmw, i) => (
-                                        <li key={i} className="text-sm text-purple-800">• {hmw}</li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-            </EditableCard>
-
-            <SuggestionPanel
-                suggestions={suggestions}
-                artifactType="insights"
-                label="To strengthen these insights"
-            />
+                </>
+            )}
 
             {/* CTA area: Insert to Canvas */}
             <Button variant="outline" className="w-full" onClick={handleInsertToCanvas}>

@@ -15,7 +15,8 @@ import {
     X,
     ArrowRight,
     Image,
-    Loader2
+    Loader2,
+    Play
 } from 'lucide-react';
 import { FileUpload } from '@/components/context/FileUpload';
 import { ContextGuidance } from '@/components/shared/ContextGuidance';
@@ -23,7 +24,7 @@ import { getOpenAIClient } from '@/lib/openai';
 import type { SelectionNode } from '@/types';
 
 export function ContextStep() {
-    const { context, addContextSource, removeContextSource, setCurrentStep } = useStore();
+    const { context, addContextSource, removeContextSource, setCurrentStep, loadDemoProject } = useStore();
     const { selection, hasSelection, extractedText } = useSelection();
     const [manualInput, setManualInput] = useState('');
     const [activeTab, setActiveTab] = useState('canvas');
@@ -387,6 +388,19 @@ export function ContextStep() {
                     Continue to Research Framing
                     <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
+            )}
+
+            {/* Demo Project CTA — shown when empty */}
+            {!hasContext && (
+                <div className="pt-2 border-t border-border/40">
+                    <button
+                        onClick={() => loadDemoProject()}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                    >
+                        <Play className="h-3 w-3" />
+                        Try a demo project — explore all steps with sample data
+                    </button>
+                </div>
             )}
         </div>
     );
