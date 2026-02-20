@@ -8,6 +8,7 @@ import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { PromptRefiner } from '@/components/shared/PromptRefiner';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
 import { StepContextInput } from '@/components/shared/StepContextInput';
+import { BiasCheckPanel } from '@/components/shared/BiasCheckPanel';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
@@ -241,6 +242,7 @@ export function InterviewGuideStep() {
                 suggestions={suggestions}
                 artifactType="interview-guide"
                 currentContent={guide}
+                mode="apply"
                 onApplied={(newContent, newConf, newSuggestions) => {
                     const conf = newConf as ConfidenceLevel;
                     setGuide(newContent as InterviewGuideContent);
@@ -249,6 +251,19 @@ export function InterviewGuideStep() {
                     addResearchObject('interview-guide', newContent, conf, newSuggestions);
                 }}
                 label="To improve this guide"
+            />
+
+            {/* Bias Check */}
+            <BiasCheckPanel
+                artifactType="interview-guide"
+                currentContent={guide}
+                onFixed={(newContent, newConf, newSuggestions) => {
+                    const conf = newConf as ConfidenceLevel;
+                    setGuide(newContent as InterviewGuideContent);
+                    setConfidence(conf);
+                    setSuggestions(newSuggestions);
+                    addResearchObject('interview-guide', newContent, conf, newSuggestions);
+                }}
             />
 
             {/* Actions */}

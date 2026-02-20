@@ -308,14 +308,6 @@ export function SynthesisStep() {
             <SuggestionPanel
                 suggestions={suggestions}
                 artifactType="insights"
-                currentContent={insights}
-                onApplied={(newContent, newConf, newSuggestions) => {
-                    const conf = newConf as ConfidenceLevel;
-                    setInsights(newContent as InsightsContent);
-                    setConfidence(conf);
-                    setSuggestions(newSuggestions);
-                    addResearchObject('insights', newContent, conf, newSuggestions);
-                }}
                 label="To strengthen these insights"
             />
 

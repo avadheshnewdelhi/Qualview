@@ -8,6 +8,7 @@ import { ConfidenceIndicator } from '@/components/shared/ConfidenceIndicator';
 import { PromptRefiner } from '@/components/shared/PromptRefiner';
 import { SuggestionPanel } from '@/components/shared/SuggestionPanel';
 import { StepContextInput } from '@/components/shared/StepContextInput';
+import { BiasCheckPanel } from '@/components/shared/BiasCheckPanel';
 import { LogicPanel, type ReasoningFactor } from '@/components/shared/LogicPanel';
 import {
     Sparkles,
@@ -223,6 +224,7 @@ export function ScreenerStep() {
                 suggestions={suggestions}
                 artifactType="screener"
                 currentContent={screener}
+                mode="apply"
                 onApplied={(newContent, newConf, newSuggestions) => {
                     const conf = newConf as ConfidenceLevel;
                     setScreener(newContent as ScreenerContent);
@@ -231,6 +233,19 @@ export function ScreenerStep() {
                     addResearchObject('screener', newContent, conf, newSuggestions);
                 }}
                 label="To improve this screener"
+            />
+
+            {/* Bias Check */}
+            <BiasCheckPanel
+                artifactType="screener"
+                currentContent={screener}
+                onFixed={(newContent, newConf, newSuggestions) => {
+                    const conf = newConf as ConfidenceLevel;
+                    setScreener(newContent as ScreenerContent);
+                    setConfidence(conf);
+                    setSuggestions(newSuggestions);
+                    addResearchObject('screener', newContent, conf, newSuggestions);
+                }}
             />
 
             {/* Actions */}

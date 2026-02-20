@@ -253,14 +253,6 @@ export function ResearchPlanStep() {
             <SuggestionPanel
                 suggestions={suggestions}
                 artifactType="plan"
-                currentContent={plan}
-                onApplied={(newContent, newConf, newSuggestions) => {
-                    const conf = newConf as ConfidenceLevel;
-                    setPlan(newContent as PlanContent);
-                    setConfidence(conf);
-                    setSuggestions(newSuggestions);
-                    addResearchObject('plan', newContent, conf, newSuggestions);
-                }}
                 label="To improve this plan"
             />
 

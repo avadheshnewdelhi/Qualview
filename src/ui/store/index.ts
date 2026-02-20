@@ -12,6 +12,7 @@ import type {
     ConfidenceLevel,
     Transcript,
 } from '@/types';
+import type { BiasCheckResult } from '@/lib/prompts/bias';
 import { postMessage } from '@/lib/figma';
 
 // Workflow steps
@@ -63,6 +64,12 @@ interface StoreState {
     // Settings
     settings: Settings | null;
 
+    // Bias check results (persisted across tab switches)
+    biasCheckResults: Record<string, BiasCheckResult>;
+
+    // Previous versions for version diff / restore
+    previousVersions: Record<string, { content: ResearchObjectContent; diffs: Array<{ questionId: string; biasType: string; before: string; after: string; rationale: string }> }>;
+
     // Actions
     setCurrentStep: (step: number) => void;
     setLoading: (loading: boolean, message?: string) => void;
@@ -101,6 +108,12 @@ interface StoreState {
     setStepContext: (stepKey: string, value: string) => void;
     getStepContext: (stepKey: string) => string;
 
+    // Bias Check Actions
+    setBiasCheckResult: (artifactType: string, result: BiasCheckResult) => void;
+    clearBiasCheckResult: (artifactType: string) => void;
+    setPreviousVersion: (artifactType: string, content: ResearchObjectContent, diffs: Array<{ questionId: string; biasType: string; before: string; after: string; rationale: string }>) => void;
+    clearPreviousVersion: (artifactType: string) => void;
+
     // Persistence
     initializeFromFigma: (state: PersistedState) => void;
     saveToFigma: () => void;
@@ -137,6 +150,8 @@ export const useStore = create<StoreState>((set, get) => ({
     transcripts: [],
     uploadedResponses: [],
     stepContexts: {},
+    biasCheckResults: {},
+    previousVersions: {},
     settings: null,
 
     // UI Actions
@@ -281,6 +296,26 @@ export const useStore = create<StoreState>((set, get) => ({
             stepContexts: { ...state.stepContexts, [stepKey]: value },
         })),
     getStepContext: (stepKey) => get().stepContexts[stepKey] || '',
+
+    // Bias Check Actions
+    setBiasCheckResult: (artifactType, result) =>
+        set((state) => ({
+            biasCheckResults: { ...state.biasCheckResults, [artifactType]: result },
+        })),
+    clearBiasCheckResult: (artifactType) =>
+        set((state) => {
+            const { [artifactType]: _, ...rest } = state.biasCheckResults;
+            return { biasCheckResults: rest };
+        }),
+    setPreviousVersion: (artifactType, content, diffs) =>
+        set((state) => ({
+            previousVersions: { ...state.previousVersions, [artifactType]: { content, diffs } },
+        })),
+    clearPreviousVersion: (artifactType) =>
+        set((state) => {
+            const { [artifactType]: _, ...rest } = state.previousVersions;
+            return { previousVersions: rest };
+        }),
 
     // Persistence
     initializeFromFigma: (state) => {

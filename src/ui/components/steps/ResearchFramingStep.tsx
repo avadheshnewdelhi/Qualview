@@ -238,14 +238,6 @@ export function ResearchFramingStep() {
             <SuggestionPanel
                 suggestions={suggestions}
                 artifactType="framing"
-                currentContent={framing}
-                onApplied={(newContent, newConf, newSuggestions) => {
-                    const conf = newConf as ConfidenceLevel;
-                    setFraming(newContent as FramingContent);
-                    setConfidence(conf);
-                    setSuggestions(newSuggestions);
-                    addResearchObject('framing', newContent, conf, newSuggestions);
-                }}
                 label="To improve confidence"
             />
 
