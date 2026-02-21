@@ -3,12 +3,12 @@ import { initializeAuth, browserLocalPersistence, indexedDBLocalPersistence } fr
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-    apiKey: 'AIzaSyAHcRS-shTHe66_2A3PlpVsCcznkRp71TY',
-    authDomain: 'qualview-plugin.firebaseapp.com',
-    projectId: 'qualview-plugin',
-    storageBucket: 'qualview-plugin.firebasestorage.app',
-    messagingSenderId: '532460466990',
-    appId: '1:532460466990:web:d4f96152a83c4109f700bf',
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
