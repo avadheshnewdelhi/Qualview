@@ -1,6 +1,7 @@
 /// <reference types="@figma/plugin-typings" />
 
 import { getLayoutConfig, getNextPosition, findQualviewNodes } from './layout';
+import { renderVisualization } from './vizRenderer';
 
 interface ResearchObject {
     id: string;
@@ -666,13 +667,24 @@ async function createResearchObjectFrame(obj: ResearchObject): Promise<FrameNode
  * Insert a research object onto the canvas with intelligent positioning
  */
 export async function insertResearchObject(obj: ResearchObject): Promise<InsertResult> {
+    const vizMap: Record<string, string> = {
+        'persona': 'persona',
+        'empathyMap': 'empathy-map',
+        'journeyMap': 'journey-map',
+    };
+
+    if (vizMap[obj.type]) {
+        const result = await renderVisualization(vizMap[obj.type], obj);
+        return { objectId: obj.id, nodeId: result.nodeId };
+    }
+
     const frame = await createResearchObjectFrame(obj);
 
     // Find existing Qualview nodes for intelligent positioning
-    const existingNodes = findQualviewNodes();
+    const existingNodes = await findQualviewNodes();
 
     // Get next position based on existing nodes
-    const position = getNextPosition(existingNodes, frame.width, frame.height);
+    const position = getNextPosition(existingNodes, frame.width, frame.height, frame);
     frame.x = position.x;
     frame.y = position.y;
 

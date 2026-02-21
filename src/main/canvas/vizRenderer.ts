@@ -731,7 +731,7 @@ export async function renderVisualization(
 
     // Position on canvas
     const existingNodes = await findQualviewNodes();
-    const pos = getNextPosition(existingNodes, VIZ_WIDTH, 400);
+    const pos = getNextPosition(existingNodes, VIZ_WIDTH, 400, frame);
     frame.x = pos.x;
     frame.y = pos.y;
 

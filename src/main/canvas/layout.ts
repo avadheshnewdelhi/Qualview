@@ -98,32 +98,37 @@ export function registerInsertedNode(nodeId: string): void {
  * with 100px gutters between artifacts
  */
 export function getNextPosition(
-    existingNodes: SceneNode[],
+    _existingNodes: SceneNode[] | null,
     _width: number,
-    _height: number
+    _height: number,
+    newNode?: SceneNode
 ): { x: number; y: number } {
     const GUTTER = 100; // Consistent 100px spacing between artifacts
+    const allNodes = figma.currentPage.children;
 
-    // If no existing nodes, start at viewport center
-    if (existingNodes.length === 0) {
+    // If no existing nodes (other than the one we are placing), start at viewport center
+    if (allNodes.length === 0 || (allNodes.length === 1 && newNode && allNodes[0].id === newNode.id)) {
         const viewport = figma.viewport.center;
         return { x: Math.round(viewport.x), y: Math.round(viewport.y) };
     }
 
-    // Find the rightmost edge and top-alignment of existing nodes
+    // Find the rightmost edge and top-alignment of ALL existing nodes
     let maxRight = -Infinity;
     let topY = Infinity;
 
-    for (const node of existingNodes) {
+    for (const node of allNodes) {
+        if (newNode && node.id === newNode.id) continue;
+
         if ('x' in node && 'y' in node && 'width' in node) {
             const right = node.x + (node.width || 0);
-            if (right > maxRight) {
-                maxRight = right;
-            }
-            if (node.y < topY) {
-                topY = node.y;
-            }
+            if (right > maxRight) maxRight = right;
+            if (node.y < topY) topY = node.y;
         }
+    }
+
+    if (maxRight === -Infinity) {
+        const viewport = figma.viewport.center;
+        return { x: Math.round(viewport.x), y: Math.round(viewport.y) };
     }
 
     // Place to the right of the rightmost node, aligned to top
